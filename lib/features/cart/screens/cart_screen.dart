@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+// --- QUAN TRỌNG: Import màn hình Checkout để nút bấm hiểu cần đi đâu ---
+import 'checkout_screen.dart';
+
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -37,7 +40,7 @@ class _CartScreenState extends State<CartScreen> {
     return total;
   }
 
-  // Hàm xử lý xóa sản phẩm (Có hiện hộp thoại xác nhận)
+  // Hàm xử lý xóa sản phẩm
   void _deleteItem(int index) {
     showDialog(
       context: context,
@@ -46,16 +49,15 @@ class _CartScreenState extends State<CartScreen> {
         content: const Text("Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng không?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(), // Đóng hộp thoại
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () {
-              // Thực hiện xóa
               setState(() {
                 cartItems.removeAt(index);
               });
-              Navigator.of(ctx).pop(); // Đóng hộp thoại
+              Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Đã xóa sản phẩm thành công!")),
               );
@@ -86,14 +88,12 @@ class _CartScreenState extends State<CartScreen> {
                     itemCount: cartItems.length,
                     itemBuilder: (context, index) {
                       final item = cartItems[index];
-                      // Vẫn giữ tính năng Vuốt để xóa
+                      // Vuốt để xóa
                       return Dismissible(
-                        key: Key(item['name'] + index.toString()), // Key unique
+                        key: Key(item['name'] + index.toString()),
                         direction: DismissDirection.endToStart,
                         confirmDismiss: (direction) async {
-                          // Trả về true nếu muốn xóa, false nếu hủy
-                          // Ở đây mình cho xóa luôn khi vuốt cho nhanh
-                          return true;
+                          return true; // Cho phép xóa luôn khi vuốt
                         },
                         onDismissed: (direction) {
                           setState(() {
@@ -141,13 +141,26 @@ class _CartScreenState extends State<CartScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
+                      
+                      // --- NÚT THANH TOÁN ĐÃ ĐƯỢC SỬA ---
                       SizedBox(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Tính năng thanh toán đang phát triển...")),
+                            if (cartItems.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Giỏ hàng đang trống!")),
+                              );
+                              return;
+                            }
+                            
+                            // CODE CHUYỂN TRANG MỚI (Lần trước bạn có thể thiếu đoạn này)
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CheckoutScreen(totalAmount: totalPrice),
+                              ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
@@ -165,7 +178,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // Widget hiển thị từng món hàng (ĐÃ CẬP NHẬT GIAO DIỆN)
+  // Widget hiển thị từng món hàng
   Widget _buildCartItem(Map<String, dynamic> item, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -177,7 +190,7 @@ class _CartScreenState extends State<CartScreen> {
       ),
       child: Row(
         children: [
-          // 1. Ảnh sản phẩm
+          // Ảnh sản phẩm
           Container(
             width: 90,
             height: 90,
@@ -191,12 +204,11 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(width: 15),
           
-          // 2. Thông tin chi tiết
+          // Thông tin chi tiết
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hàng 1: Tên + Nút Xóa (Icon thùng rác)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +221,6 @@ class _CartScreenState extends State<CartScreen> {
                         overflow: TextOverflow.ellipsis
                       ),
                     ),
-                    // NÚT XÓA Ở ĐÂY
                     GestureDetector(
                       onTap: () => _deleteItem(index),
                       child: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
@@ -221,7 +232,6 @@ class _CartScreenState extends State<CartScreen> {
                 Text("Size: ${item['size']} | Màu: Đen", style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 const SizedBox(height: 10),
                 
-                // Hàng 3: Giá + Nút tăng giảm số lượng
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -246,7 +256,6 @@ class _CartScreenState extends State<CartScreen> {
                                   item['quantity']--;
                                 });
                               } else {
-                                // Nếu số lượng = 1 mà bấm trừ thì hỏi xóa luôn
                                 _deleteItem(index);
                               }
                             },
