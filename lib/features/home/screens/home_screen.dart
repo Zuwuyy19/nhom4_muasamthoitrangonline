@@ -38,6 +38,71 @@ class _HomeScreenState extends State<HomeScreen> {
       "price": "420.000đ",
       "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
     },
+    {
+      "name": "Áo thun mùa hè",
+      "price": "400.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo thun thể thao",
+      "price": "480.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Quần đùi nam",
+      "price": "400.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Quần đùi nữ",
+      "price": "400.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Quần túi hộp",
+      "price": "600.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo khoác jean",
+      "price": "710.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo khoác dù",
+      "price": "540.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo khoác nỉ",
+      "price": "650.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo dài tay",
+      "price": "650.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo len",
+      "price": "650.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo khoác nỉ",
+      "price": "650.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Áo cổ lọ",
+      "price": "550.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
+    {
+      "name": "Quần tây dài",
+      "price": "650.000đ",
+      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
+    },
   ];
 
   @override
