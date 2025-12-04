@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-// Import đúng đường dẫn package của bạn
-import 'package:nhom4_muasamthoitrangonline/features/product/widgets/product_card.dart';
-import 'package:nhom4_muasamthoitrangonline/features/product/screens/product_detail_screen.dart';
+// Import các màn hình
+import '../../product/widgets/product_card.dart';
+import '../../product/screens/product_detail_screen.dart';
+import '../../cart/screens/cart_screen.dart'; 
 
 class HomeScreen extends StatefulWidget {
-  // Đã dùng super.key chuẩn rồi
   const HomeScreen({super.key});
 
   @override
@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Dữ liệu giả
   final List<String> categories = ["Tất cả", "Áo thun", "Sơ mi", "Quần Jeans", "Giày", "Phụ kiện"];
   int selectedCategoryIndex = 0;
 
@@ -53,7 +54,16 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           Stack(
             children: [
-              IconButton(onPressed: () {}, icon: const Icon(Icons.shopping_bag_outlined)),
+              IconButton(
+                onPressed: () {
+                  // --- SỬA LỖI TẠI ĐÂY (Đã bỏ const) ---
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => CartScreen()),
+                  );
+                }, 
+                icon: const Icon(Icons.shopping_bag_outlined)
+              ),
               Positioned(
                 right: 8, top: 8,
                 child: Container(
@@ -72,14 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- SEARCH BAR (SỬA LỖI TẠI ĐÂY) ---
+            // Search Bar
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
-                    // SỬA LỖI: Thay withOpacity(0.1) -> withValues(alpha: 0.1)
                     color: Colors.grey.withValues(alpha: 0.1), 
                     blurRadius: 10, 
                     offset: const Offset(0, 5)
@@ -98,10 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            
             const SizedBox(height: 25),
 
-            // --- BANNER ---
+            // Banner
             Container(
               width: double.infinity,
               height: 160,
@@ -137,10 +145,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
 
-            // --- CATEGORIES ---
+            // Categories
             SizedBox(
               height: 40,
               child: ListView.builder(
@@ -173,10 +180,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-
             const SizedBox(height: 25),
 
-            // --- TITLE ---
+            // Title
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -186,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
 
-            // --- GRID VIEW ---
+            // Grid View
             GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               shrinkWrap: true,
