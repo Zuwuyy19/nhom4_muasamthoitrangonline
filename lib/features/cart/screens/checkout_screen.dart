@@ -81,7 +81,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               
               _buildPaymentOption(1, "Thanh toán khi nhận hàng (COD)", Icons.money, Colors.green),
               const SizedBox(height: 10),
-              _buildPaymentOption(2, "Ví điện tử MoMo / ZaloPay", Icons.account_balance_wallet, Colors.pink),
+              _buildPaymentOption(2, "Ví điện tử MoMo", Icons.account_balance_wallet, Colors.pink),
+
+              const SizedBox(height: 10),
+              // Thêm phương thức thanh toán VNPay
+              _buildPaymentOption(3, "Thanh toán qua VNPay", Icons.payment, Colors.blue),
 
               const SizedBox(height: 30),
 
@@ -181,6 +185,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _handleOrder() {
     if (_formKey.currentState!.validate()) {
+      if (_paymentMethod == 3) {
+        // Nếu chọn VNPay, chỉ hiển thị thông báo đang phát triển
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Tính năng VNPay đang phát triển...")),
+        );
+        return;
+      }
       showDialog(
         context: context,
         barrierDismissible: false,
