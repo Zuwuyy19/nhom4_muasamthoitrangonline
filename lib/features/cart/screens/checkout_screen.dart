@@ -24,6 +24,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   LatLng _selectedLocation = const LatLng(10.801657, 106.714247);
   String _addressName = "Chưa chọn vị trí";
   bool _isLoadingAddress = false;
+  // Controller cho trường 'Địa chỉ chi tiết' để có thể tự động điền
+  final TextEditingController _addressController = TextEditingController();
+  // Controller cho thanh tìm kiếm trong popup bản đồ
+  final TextEditingController _mapSearchController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +52,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 15),
               _buildTextField("Số điện thoại", Icons.phone, "Vui lòng nhập số điện thoại", isNumber: true),
               const SizedBox(height: 15),
-              _buildTextField("Địa chỉ chi tiết", Icons.location_on, "Vui lòng nhập số nhà..."),
+              _buildTextField("Địa chỉ chi tiết", Icons.location_on, "Vui lòng nhập số nhà...", controller: _addressController),
               
               const SizedBox(height: 15),
 
@@ -154,6 +158,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    _addressController.dispose();
+    _mapSearchController.dispose();
+    super.dispose();
+  }
+
+  // Tìm địa điểm (forward geocoding) bằng Nominatim và trả về LatLng nếu tìm thấy
+  Future<LatLng?> _searchPlace(String query) async {
+    if (query.trim().isEmpty) return null;
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1');
+      final response = await http.get(url, headers: {
+        'User-Agent': 'com.nhom4.muasamthoitrang',
+      });
+
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        if (data.isNotEmpty) {
+          final item = data[0];
+          final lat = double.tryParse(item['lat'].toString());
+          final lon = double.tryParse(item['lon'].toString());
+          if (lat != null && lon != null) {
+            return LatLng(lat, lon);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore errors, caller can show message
+    }
+    return null;
+  }
+
   // --- HÀM LẤY TÊN TỪ TOẠ ĐỘ ---
   Future<void> _getAddressFromLatLng(LatLng point) async {
     setState(() {
@@ -174,17 +211,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         setState(() {
           _addressName = data['display_name'] ?? "Không tìm thấy tên đường";
           _isLoadingAddress = false;
+          // Cập nhật vào trường địa chỉ chi tiết nếu có controller
+          _addressController.text = _addressName;
         });
       } else {
         setState(() {
           _addressName = "Lỗi kết nối máy chủ bản đồ";
           _isLoadingAddress = false;
+          _addressController.text = _addressName;
         });
       }
     } catch (e) {
       setState(() {
         _addressName = "Vị trí: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
         _isLoadingAddress = false;
+        _addressController.text = _addressName;
       });
     }
   }
@@ -240,18 +281,67 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 height: size.height * 0.8,
                 child: Column(
                   children: [
-                    // Header
+                    // Header (title + search field)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       color: Colors.black,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
                         children: [
-                          const Text("Chọn vị trí giao hàng", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            onPressed: () => Navigator.pop(context),
-                          )
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("Chọn vị trí giao hàng", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white),
+                                onPressed: () => Navigator.pop(context),
+                              )
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Search field inside map dialog
+                          TextField(
+                            controller: _mapSearchController,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (value) async {
+                              FocusScope.of(context).unfocus();
+                              final result = await _searchPlace(value);
+                              if (result != null) {
+                                setStateMap(() {
+                                  tempLocation = result;
+                                });
+                                mapController.move(result, 17.0);
+                                // Cập nhật tên địa chỉ và ô chi tiết luôn
+                                _getAddressFromLatLng(result);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không tìm thấy địa điểm')));
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Tìm kiếm địa điểm, ví dụ: 123 Đường A',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.arrow_circle_right_outlined),
+                                onPressed: () async {
+                                  FocusScope.of(context).unfocus();
+                                  final value = _mapSearchController.text;
+                                  final result = await _searchPlace(value);
+                                  if (result != null) {
+                                    setStateMap(() {
+                                      tempLocation = result;
+                                    });
+                                    mapController.move(result, 17.0);
+                                    _getAddressFromLatLng(result);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không tìm thấy địa điểm')));
+                                  }
+                                },
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -321,8 +411,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           setState(() {
                             _selectedLocation = tempLocation;
                           });
-                          Navigator.pop(context);
-                          _getAddressFromLatLng(tempLocation);
+                            // Đóng dialog trước, sau đó lấy tên địa chỉ và cập nhật cả hiển thị và field chi tiết
+                            Navigator.pop(context);
+                            _getAddressFromLatLng(tempLocation);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
@@ -342,8 +433,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   // --- CÁC WIDGET PHỤ TRỢ (Text Field, Payment Option...) ---
-  Widget _buildTextField(String label, IconData icon, String errorMsg, {bool isNumber = false}) {
+  Widget _buildTextField(String label, IconData icon, String errorMsg, {bool isNumber = false, TextEditingController? controller}) {
     return TextFormField(
+      controller: controller,
       keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
       validator: (value) => (value == null || value.isEmpty) ? errorMsg : null,
       decoration: InputDecoration(

@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
   // 1. Dữ liệu gốc (Toàn bộ sản phẩm)
   final List<Map<String, dynamic>> _allProducts = [
     {
@@ -89,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
             Text(
-              "Xin chào, Vũ Huy 👋",
+              "Chào mừng đến shop 👋",
               style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.normal),
             ),
             Text(
@@ -125,183 +126,235 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- 1. THANH TÌM KIẾM (SEARCH BAR) ---
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    blurRadius: 10, 
-                    offset: const Offset(0, 5)
-                  )
-                ],
-              ),
-              child: TextField(
-                onChanged: (value) => _runFilter(value), // GỌI HÀM TÌM KIẾM KHI GÕ
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, color: Colors.grey),
-                  hintText: "Tìm kiếm sản phẩm...",
-                  hintStyle: TextStyle(color: Colors.grey),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 15),
-                ),
+      body: _selectedIndex == 0 ? _homeContent() : _pageForIndex(_selectedIndex),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), label: 'Danh mục'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: 'Giỏ hàng'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Tài khoản'),
+        ],
+      ),
+    );
+  }
+
+  // Tách phần nội dung màn hình chính để dễ quản lý khi dùng BottomNavigationBar
+  Widget _homeContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- 1. THANH TÌM KIẾM (SEARCH BAR) ---
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  blurRadius: 10, 
+                  offset: const Offset(0, 5)
+                )
+              ],
+            ),
+            child: TextField(
+              onChanged: (value) => _runFilter(value), // GỌI HÀM TÌM KIẾM KHI GÕ
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search, color: Colors.grey),
+                hintText: "Tìm kiếm sản phẩm...",
+                hintStyle: TextStyle(color: Colors.grey),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 15),
               ),
             ),
-            
-            const SizedBox(height: 25),
+          ),
+          
+          const SizedBox(height: 25),
 
-            // --- 2. BANNER (ĐÃ SỬA LỖI OVERFLOW) ---
-            Container(
-              width: double.infinity,
-              height: 220, // Tăng chiều cao lên 220 để đủ chỗ
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(20),
-                image: const DecorationImage(
-                  image: NetworkImage("https://cdn.pixabay.com/photo/2017/08/01/11/48/woman-2564660_1280.jpg"),
-                  fit: BoxFit.cover,
-                  opacity: 0.6,
-                ),
+          // --- 2. BANNER (ĐÃ SỬA LỖI OVERFLOW) ---
+          Container(
+            width: double.infinity,
+            height: 220, // Tăng chiều cao lên 220 để đủ chỗ
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(20),
+              image: const DecorationImage(
+                image: NetworkImage("https://cdn.pixabay.com/photo/2017/08/01/11/48/woman-2564660_1280.jpg"),
+                fit: BoxFit.cover,
+                opacity: 0.6,
               ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                // Bỏ MainAxisAlignment.center để dùng Spacer linh hoạt hơn
-                children: [
-                  const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
-                  const SizedBox(height: 5),
-                  const Text(
-                    "GIẢM GIÁ\nMÙA HÈ 50%", 
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              // Bỏ MainAxisAlignment.center để dùng Spacer linh hoạt hơn
+              children: [
+                const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
+                const SizedBox(height: 5),
+                const Text(
+                  "GIẢM GIÁ\nMÙA HÈ 50%", 
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+                ),
+                
+                const Spacer(), // Spacer tự động đẩy nút xuống dưới cùng
+                
+                ElevatedButton(
+                  onPressed: () {}, 
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white, 
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  
-                  const Spacer(), // Spacer tự động đẩy nút xuống dưới cùng
-                  
-                  ElevatedButton(
-                    onPressed: () {}, 
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white, 
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text("Xem ngay", style: TextStyle(fontSize: 12)),
-                  )
-                ],
-              ),
+                  child: const Text("Xem ngay", style: TextStyle(fontSize: 12)),
+                )
+              ],
             ),
+          ),
 
-            const SizedBox(height: 25),
+          const SizedBox(height: 25),
 
-            // --- 3. DANH MỤC (CATEGORIES) ---
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final isSelected = selectedCategoryIndex == index;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedCategoryIndex = index;
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 15),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.black : Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Center(
-                        child: Text(
-                          categories[index],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12
-                          ),
+          // --- 3. DANH MỤC (CATEGORIES) ---
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final isSelected = selectedCategoryIndex == index;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedCategoryIndex = index;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 15),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.black : Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Center(
+                      child: Text(
+                        categories[index],
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12
                         ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          // --- 4. KẾT QUẢ TÌM KIẾM ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Sản phẩm nổi bật", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              TextButton(onPressed: () {}, child: const Text("Xem tất cả", style: TextStyle(color: Colors.grey))),
+            ],
+          ),
+          
+          const SizedBox(height: 10),
+
+          // --- GRID VIEW HIỂN THỊ KẾT QUẢ ---
+          _filteredProducts.isNotEmpty 
+          ? GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: _filteredProducts.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              childAspectRatio: 0.7,
+            ),
+            itemBuilder: (context, index) {
+              final product = _filteredProducts[index];
+              return ProductCard(
+                title: product["name"],
+                price: product["price"],
+                imageUrl: product["image"],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProductDetailScreen(
+                        name: product["name"],
+                        price: product["price"],
+                        imageUrl: product["image"],
                       ),
                     ),
                   );
                 },
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            // --- 4. KẾT QUẢ TÌM KIẾM ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text("Sản phẩm nổi bật", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () {}, child: const Text("Xem tất cả", style: TextStyle(color: Colors.grey))),
+              );
+            },
+          )
+          : Center(
+            child: Column(
+              children: const [
+                SizedBox(height: 20),
+                Icon(Icons.search_off, size: 50, color: Colors.grey),
+                SizedBox(height: 10),
+                Text("Không tìm thấy sản phẩm nào", style: TextStyle(color: Colors.grey)),
               ],
             ),
-            
-            const SizedBox(height: 10),
-
-            // --- GRID VIEW HIỂN THỊ KẾT QUẢ ---
-            _filteredProducts.isNotEmpty 
-            ? GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: _filteredProducts.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                childAspectRatio: 0.7,
-              ),
-              itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
-                return ProductCard(
-                  title: product["name"],
-                  price: product["price"],
-                  imageUrl: product["image"],
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProductDetailScreen(
-                          name: product["name"],
-                          price: product["price"],
-                          imageUrl: product["image"],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            )
-            : Center(
-              child: Column(
-                children: const [
-                  SizedBox(height: 20),
-                  Icon(Icons.search_off, size: 50, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text("Không tìm thấy sản phẩm nào", style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          
+          const SizedBox(height: 20),
+        ],
       ),
     );
+  }
+
+  Widget _pageForIndex(int index) {
+    switch (index) {
+      case 1:
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.grid_view_outlined, size: 56, color: Colors.grey),
+              SizedBox(height: 8),
+              Text('Danh mục', style: TextStyle(fontSize: 18)),
+            ],
+          ),
+        );
+      case 2:
+        // Hiển thị màn hình giỏ hàng (đã import sẵn `CartScreen`)
+        return const CartScreen();
+      case 3:
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.person_outline, size: 56, color: Colors.grey),
+              SizedBox(height: 8),
+              Text('Tài khoản', style: TextStyle(fontSize: 18)),
+            ],
+          ),
+        );
+      default:
+        return _homeContent();
+    }
   }
 }
