@@ -26,14 +26,6 @@ class _CardPaymentScreenState extends State<CardPaymentScreen> {
 
   bool _isProcessing = false;
 
-  // Test card numbers from MoMo Developer
-  static const String testCardSuccess = '9704000000000018'; // Thành công
-  static const String testCardLocked = '9704000000000026'; // Thẻ bị khóa
-  static const String testCardNoLimit = '9704000000000034'; // Nguồn tiền không đủ
-  static const String testCardLowLimit = '9704000000000042'; // Hạn mức thẻ
-  static const String testCardName = 'NGUYEN VAN A';
-  static const String testCardExpiry = '0307';
-
   @override
   void initState() {
     super.initState();
@@ -420,29 +412,7 @@ class _CardPaymentScreenState extends State<CardPaymentScreen> {
       try {
         final digitsOnly = _cardNumberController.text.replaceAll(RegExp(r'\D'), '');
 
-        // Simulate test card outcomes based on card number
-        if (digitsOnly == testCardLocked) {
-          if (!mounted) return;
-          setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thẻ bị khóa')));
-          return;
-        }
-
-        if (digitsOnly == testCardNoLimit) {
-          if (!mounted) return;
-          setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nguồn tiền không đủ')));
-          return;
-        }
-
-        if (digitsOnly == testCardLowLimit) {
-          if (!mounted) return;
-          setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hạn mức thẻ')));
-          return;
-        }
-
-        // For success or any other valid 16-digit card, proceed to OTP flow
+        // Với thẻ hợp lệ, tiếp tục luồng OTP
         if (!mounted) return;
         setState(() => _isProcessing = false);
 

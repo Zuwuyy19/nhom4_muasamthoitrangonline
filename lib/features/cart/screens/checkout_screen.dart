@@ -4,8 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart'; // Thư viện GPS
-// Đảm bảo đường dẫn import này đúng với project của bạn
-import '../../home/screens/home_screen.dart'; 
+import '../../home/screens/home_screen.dart';
+import 'momo_payment_screen.dart'; 
 
 class CheckoutScreen extends StatefulWidget {
   final int totalAmount;
@@ -28,6 +28,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _addressController = TextEditingController();
   // Controller cho thanh tìm kiếm trong popup bản đồ
   final TextEditingController _mapSearchController = TextEditingController();
+  // Controllers cho tên và số điện thoại
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +51,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const Text("Địa chỉ nhận hàng", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
               
-              _buildTextField("Họ và tên", Icons.person, "Vui lòng nhập tên"),
+              _buildTextField("Họ và tên", Icons.person, "Vui lòng nhập tên", controller: _nameController),
               const SizedBox(height: 15),
-              _buildTextField("Số điện thoại", Icons.phone, "Vui lòng nhập số điện thoại", isNumber: true),
+              _buildTextField("Số điện thoại", Icons.phone, "Vui lòng nhập số điện thoại", isNumber: true, controller: _phoneController),
               const SizedBox(height: 15),
               _buildTextField("Địa chỉ chi tiết", Icons.location_on, "Vui lòng nhập số nhà...", controller: _addressController),
               
@@ -162,6 +165,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void dispose() {
     _addressController.dispose();
     _mapSearchController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -486,41 +491,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _handleOrder() {
     if (_formKey.currentState!.validate()) {
-      if (_paymentMethod == 2 || _paymentMethod == 3) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tính năng đang phát triển...")));
-        return;
-      }
+      // Lấy dữ liệu từ TextEditingController
+      final String customerName = _nameController.text.trim();
+      final String phoneNumber = _phoneController.text.trim();
       
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 80),
-              const SizedBox(height: 20),
-              const Text("Đặt hàng thành công!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-               const SizedBox(height: 10),
-               const Text("Giao đến:", style: TextStyle(color: Colors.grey)),
-               const SizedBox(height: 5),
-               Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const HomeScreen()), (route) => false);
-                  },
-                  child: const Text("Tiếp tục mua sắm", style: TextStyle(color: Colors.white)),
-                ),
-              )
-            ],
+      if (_paymentMethod == 1) {
+        // COD - Hiển thị dialog xác nhận
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 80),
+                const SizedBox(height: 20),
+                const Text("Đặt hàng thành công!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 10),
+                 const Text("Giao đến:", style: TextStyle(color: Colors.grey)),
+                 const SizedBox(height: 5),
+                 Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const HomeScreen()), (route) => false);
+                    },
+                    child: const Text("Tiếp tục mua sắm", style: TextStyle(color: Colors.white)),
+                  ),
+                )
+              ],
+            ),
           ),
-        ),
-      );
+        );
+      } else if (_paymentMethod == 2) {
+        // MoMo - Điều hướng tới MoMo payment screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MomoPaymentScreen(
+              totalAmount: widget.totalAmount + 30000, // Tổng tiền + phí vận chuyển
+              customerName: customerName,
+              phoneNumber: phoneNumber,
+            ),
+          ),
+        );
+      } else if (_paymentMethod == 3) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tính năng VNPay đang phát triển...")));
+      }
     }
   }
 }
