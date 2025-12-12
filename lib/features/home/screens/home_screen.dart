@@ -1,9 +1,17 @@
+// lib/home/screens/home_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart'; 
 
 // Import các màn hình khác (Dùng đường dẫn tương đối)
 import '../../product/widgets/product_card.dart';
 import '../../product/screens/product_detail_screen.dart';
 import '../../cart/screens/cart_screen.dart'; 
+
+// Khai báo tham chiếu đến node 'products' trong Realtime Database
+final DatabaseReference _productsRef = FirebaseDatabase.instance.ref('products');
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,77 +22,126 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  // 1. Dữ liệu gốc (Toàn bộ sản phẩm)
-  final List<Map<String, dynamic>> _allProducts = [
-    {
-      "name": "Áo Thun Oversize HUTECH",
-      "price": "150.000đ",
-      "image": "https://cdn.pixabay.com/photo/2016/11/22/19/08/hangers-1850082_1280.jpg"
-    },
-    {
-      "name": "Quần Jeans Slimfit",
-      "price": "350.000đ",
-      "image": "https://cdn.pixabay.com/photo/2014/08/26/21/48/jeans-428613_1280.jpg"
-    },
-    {
-      "name": "Sneaker Trắng Basic",
-      "price": "500.000đ",
-      "image": "https://cdn.pixabay.com/photo/2016/11/19/18/06/feet-1840619_1280.jpg"
-    },
-    {
-      "name": "Áo Hoodie Mùa Đông",
-      "price": "420.000đ",
-      "image": "https://cdn.pixabay.com/photo/2016/11/29/01/34/man-1866572_1280.jpg"
-    },
-    {
-      "name": "Áo Khoác Bomber",
-      "price": "600.000đ",
-      "image": "https://cdn.pixabay.com/photo/2016/04/19/13/39/jacket-1338879_1280.jpg"
-    },
-    {
-      "name": "Mũ Lưỡi Trai Đen",
-      "price": "100.000đ",
-      "image": "https://cdn.pixabay.com/photo/2017/05/13/12/40/fashion-2309519_1280.jpg"
-    },
-  ];
-
-  // 2. Danh sách dùng để hiển thị (Sẽ thay đổi khi tìm kiếm)
+  
+  // Dữ liệu gốc (đã chuẩn hóa) và dữ liệu lọc
+  List<Map<String, dynamic>> _allProducts = []; 
   List<Map<String, dynamic>> _filteredProducts = [];
-
+  
   final List<String> categories = ["Tất cả", "Áo thun", "Sơ mi", "Quần Jeans", "Giày", "Phụ kiện"];
   int selectedCategoryIndex = 0;
+  String _searchKeyword = ""; 
+  
+  // Trạng thái loading/đã tải dữ liệu ban đầu
+  bool _isDataLoadedAndFiltered = false;
 
   @override
   void initState() {
     super.initState();
-    // Ban đầu, danh sách hiển thị bằng danh sách gốc
     _filteredProducts = _allProducts;
   }
+  
+  // --- HÀM TẢI, ÉP KIỂU VÀ CHUẨN HÓA DỮ LIỆU TỪ FIREBASE ---
+  // Hàm này KHÔNG gọi setState. Nó chỉ xử lý và cập nhật các biến State.
+  void _loadAndStandardizeProducts(Map<String, dynamic>? rawProductsMap) {
+    if (!mounted) return;
 
-  // --- HÀM XỬ LÝ TÌM KIẾM ---
-  void _runFilter(String enteredKeyword) {
-    List<Map<String, dynamic>> results = [];
-    if (enteredKeyword.isEmpty) {
-      // Nếu ô tìm kiếm rỗng, hiển thị lại tất cả
-      results = _allProducts;
-    } else {
-      // Lọc các sản phẩm có tên chứa từ khóa (không phân biệt hoa thường)
-      results = _allProducts
-          .where((product) =>
-              product["name"].toLowerCase().contains(enteredKeyword.toLowerCase()))
-          .toList();
+    List<Map<String, dynamic>> loadedProducts = [];
+    
+    if (rawProductsMap != null && rawProductsMap.isNotEmpty) {
+        rawProductsMap.forEach((id, data) {
+          if (data is Map) {
+            Map<String, dynamic> productData = Map<String, dynamic>.from(data as Map);
+
+            // Xử lý giá (đảm bảo price là Number trong Firebase)
+            final priceRaw = productData["price"] ?? 0;
+            // Ép giá về int để định dạng
+            final int priceInt = int.tryParse(priceRaw.toString()) ?? 0;
+            
+            final String formattedPrice = priceInt.toString().replaceAllMapped(
+                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+                (Match m) => '${m[1]}.'
+            );
+            
+            loadedProducts.add({
+              "id": id,
+              "name": productData["name"] ?? "Sản phẩm không tên",
+              "price": "${formattedPrice}đ", 
+              "image": productData["image"] ?? "",
+              "category": productData["category"] ?? "Tất cả",
+            });
+          }
+        });
     }
 
-    // Cập nhật giao diện
-    setState(() {
-      _filteredProducts = results;
-    });
+    // Cập nhật _allProducts
+    _allProducts = loadedProducts; 
+    
+    // Áp dụng bộ lọc cho dữ liệu mới nhất
+    _applyFilterLogic(_searchKeyword, selectedCategoryIndex);
+    
+    // Thiết lập cờ đã tải dữ liệu
+    _isDataLoadedAndFiltered = true;
+    
+    // Cập nhật UI (Sẽ được gọi từ _callSetStateSafely)
+  }
+  
+  // Hàm này được gọi từ các widget tương tác hoặc sau khi tải Firebase để đảm bảo UI cập nhật
+  void _callSetStateSafely() {
+      if (mounted) {
+          setState(() {
+              // Hàm này chỉ kích hoạt build()
+          });
+      }
+  }
+  
+  // Hàm chạy logic lọc (KHÔNG gọi setState)
+  void _applyFilterLogic(String enteredKeyword, int categoryIndex) {
+      _searchKeyword = enteredKeyword;
+      selectedCategoryIndex = categoryIndex;
+
+      List<Map<String, dynamic>> results = _allProducts;
+      String keyword = _searchKeyword.toLowerCase();
+      
+      // LỌC THEO TỪ KHÓA
+      if (keyword.isNotEmpty) {
+        results = results
+            .where((product) =>
+                product["name"].toLowerCase().contains(keyword))
+            .toList();
+      }
+      
+      // LỌC THEO DANH MỤC
+      final selectedCategory = categories[selectedCategoryIndex];
+      if (selectedCategory != "Tất cả") {
+        results = results.where((product) => 
+            product["category"]?.toString().toLowerCase() == selectedCategory.toLowerCase()
+        ).toList();
+      }
+
+      // Cập nhật _filteredProducts mà KHÔNG gọi setState
+      _filteredProducts = results; 
+  }
+
+
+  // Widget hiển thị khi không tìm thấy sản phẩm
+  Widget _buildNoProductFound({String message = "Không tìm thấy sản phẩm nào."}) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 50),
+          const Icon(Icons.search_off, size: 50, color: Colors.grey),
+          const SizedBox(height: 10),
+          Text(message, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // --- APP BAR ---
+      // --- APP BAR (Giữ nguyên) ---
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,6 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       
       body: _selectedIndex == 0 ? _homeContent() : _pageForIndex(_selectedIndex),
+      
+      // --- BOTTOM NAVIGATION BAR (Giữ nguyên) ---
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -145,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Tách phần nội dung màn hình chính để dễ quản lý khi dùng BottomNavigationBar
+  // Tách phần nội dung màn hình chính
   Widget _homeContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -159,14 +218,18 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   blurRadius: 10, 
                   offset: const Offset(0, 5)
                 )
               ],
             ),
             child: TextField(
-              onChanged: (value) => _runFilter(value), // GỌI HÀM TÌM KIẾM KHI GÕ
+              onChanged: (value) {
+                  // Áp dụng bộ lọc và kích hoạt UI cập nhật
+                  _applyFilterLogic(value, selectedCategoryIndex); 
+                  _callSetStateSafely(); 
+              }, 
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search, color: Colors.grey),
                 hintText: "Tìm kiếm sản phẩm...",
@@ -181,10 +244,10 @@ class _HomeScreenState extends State<HomeScreen> {
           
           const SizedBox(height: 25),
 
-          // --- 2. BANNER (ĐÃ SỬA LỖI OVERFLOW) ---
+          // --- 2. BANNER (Giữ nguyên) ---
           Container(
             width: double.infinity,
-            height: 220, // Tăng chiều cao lên 220 để đủ chỗ
+            height: 220, 
             decoration: BoxDecoration(
               color: Colors.black,
               borderRadius: BorderRadius.circular(20),
@@ -197,7 +260,6 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              // Bỏ MainAxisAlignment.center để dùng Spacer linh hoạt hơn
               children: [
                 const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
                 const SizedBox(height: 5),
@@ -206,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
                 ),
                 
-                const Spacer(), // Spacer tự động đẩy nút xuống dưới cùng
+                const Spacer(), 
                 
                 ElevatedButton(
                   onPressed: () {}, 
@@ -235,9 +297,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 final isSelected = selectedCategoryIndex == index;
                 return GestureDetector(
                   onTap: () {
-                    setState(() {
-                      selectedCategoryIndex = index;
-                    });
+                    // Áp dụng bộ lọc và kích hoạt UI cập nhật
+                    _applyFilterLogic(_searchKeyword, index);
+                    _callSetStateSafely(); 
                   },
                   child: Container(
                     margin: const EdgeInsets.only(right: 15),
@@ -265,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 25),
 
-          // --- 4. KẾT QUẢ TÌM KIẾM ---
+          // --- 4. TIÊU ĐỀ KẾT QUẢ TÌM KIẾM ---
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -276,48 +338,96 @@ class _HomeScreenState extends State<HomeScreen> {
           
           const SizedBox(height: 10),
 
-          // --- GRID VIEW HIỂN THỊ KẾT QUẢ ---
-          _filteredProducts.isNotEmpty 
-          ? GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            itemCount: _filteredProducts.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 0.7,
-            ),
-            itemBuilder: (context, index) {
-              final product = _filteredProducts[index];
-              return ProductCard(
-                title: product["name"],
-                price: product["price"],
-                imageUrl: product["image"],
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProductDetailScreen(
-                        name: product["name"],
-                        price: product["price"],
-                        imageUrl: product["image"],
-                      ),
-                    ),
+          // --- GRID VIEW HIỂN THỊ KẾT QUẢ (StreamBuilder) ---
+          StreamBuilder<DatabaseEvent>(
+            stream: _productsRef.onValue,
+            builder: (context, snapshot) {
+              
+              // *******************************************************************
+              // 1. XỬ LÝ DỮ LIỆU FIREBASE VÀ GỌI setState SAU BUILD
+              // *******************************************************************
+              final data = snapshot.data?.snapshot.value;
+              final Map<String, dynamic> productsMap = {};
+
+              if (data != null && data is Map) {
+                  (data as Map).forEach((key, value) {
+                    if (key is String && value is Map) {
+                        productsMap[key] = Map<String, dynamic>.from(value);
+                    }
+                  });
+              }
+
+              // Chỉ gọi cập nhật State nếu dữ liệu mới (productsMap) khác _allProducts
+              // Nếu StreamBuilder có data mới (sau khi tải xong), ta gọi cập nhật
+              if (snapshot.connectionState != ConnectionState.waiting) {
+                  // Chỉ gọi cập nhật khi có sự kiện từ Stream
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                      // Kiểm tra xem dữ liệu mới có khác dữ liệu cũ không (để tránh vòng lặp)
+                      // Dù lỗi log lặp đã được sửa, kiểm tra này vẫn tốt cho hiệu suất
+                      if (productsMap.length != _allProducts.length || snapshot.data!.snapshot.value != null) {
+                         _loadAndStandardizeProducts(productsMap);
+                         _callSetStateSafely(); 
+                      }
+                  });
+              }
+              
+              
+              // *******************************************************************
+              // 2. LOGIC HIỂN THỊ UI
+              // *******************************************************************
+
+              // A. Loading ban đầu
+              if (!_isDataLoadedAndFiltered) {
+                 return const Center(child: Padding(
+                   padding: EdgeInsets.only(top: 50.0),
+                   child: CircularProgressIndicator(),
+                 ));
+              }
+
+              // B. Hiển thị Lỗi
+              if (snapshot.hasError) {
+                  return _buildNoProductFound(message: 'Lỗi tải dữ liệu: ${snapshot.error}');
+              }
+
+              // C. Hiển thị Không tìm thấy sản phẩm
+              if (_filteredProducts.isEmpty) {
+                  return _buildNoProductFound(message: "Không tìm thấy sản phẩm nào.");
+              }
+              
+              // D. Hiển thị Grid View
+              return GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: _filteredProducts.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 0.7,
+                ),
+                itemBuilder: (context, index) {
+                  final product = _filteredProducts[index];
+                  
+                  return ProductCard(
+                    title: product["name"] ?? "Sản phẩm",
+                    price: product["price"] ?? "N/A", 
+                    imageUrl: product["image"] ?? "",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductDetailScreen(
+                            name: product["name"] ?? "Sản phẩm",
+                            price: product["price"] ?? "N/A",
+                            imageUrl: product["image"] ?? "",
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               );
             },
-          )
-          : Center(
-            child: Column(
-              children: const [
-                SizedBox(height: 20),
-                Icon(Icons.search_off, size: 50, color: Colors.grey),
-                SizedBox(height: 10),
-                Text("Không tìm thấy sản phẩm nào", style: TextStyle(color: Colors.grey)),
-              ],
-            ),
           ),
           
           const SizedBox(height: 20),
@@ -340,7 +450,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       case 2:
-        // Hiển thị màn hình giỏ hàng (đã import sẵn `CartScreen`)
         return const CartScreen();
       case 3:
         return Center(

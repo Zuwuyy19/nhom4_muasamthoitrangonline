@@ -1,3 +1,4 @@
+// [your_project_path]/lib/screens/checkout/checkout_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,6 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart'; // Thư viện GPS
 import '../../home/screens/home_screen.dart';
 import 'momo_payment_screen.dart'; 
+import 'vnpay_payment_screen.dart'; // <-- THÊM IMPORT VNPAY
+import 'package:webview_flutter/webview_flutter.dart'; // <-- THÊM IMPORT NÀY (nếu chưa có)
+// ... (phần imports ở trên)
 
 class CheckoutScreen extends StatefulWidget {
   final int totalAmount;
@@ -20,6 +24,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   int _paymentMethod = 1; 
   
+  // *** QUAN TRỌNG: ĐỊA CHỈ IP KẾT NỐI VỚI BACKEND NODE.JS ***
+  // Dành cho Android Emulator:
+  final String backendApiUrl = 'http://172.17.151.114:3000/create_payment_url';
+  // Dành cho iOS Simulator: 'http://localhost:3000/create_payment_url'
+  // -----------------------------------------------------------
+
   // Tọa độ mặc định (Ví dụ: HUTECH - TPHCM)
   LatLng _selectedLocation = const LatLng(10.801657, 106.714247);
   String _addressName = "Chưa chọn vị trí";
@@ -34,6 +44,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (Giữ nguyên phần build)
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -161,6 +172,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // ... (Giữ nguyên các hàm dispose, _searchPlace, _getAddressFromLatLng, _determinePosition, _showMapPicker)
   @override
   void dispose() {
     _addressController.dispose();
@@ -488,12 +500,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ],
     );
   }
-
-  void _handleOrder() {
+  
+  // --- HÀM XỬ LÝ ĐẶT HÀNG ---
+  void _handleOrder() async { // <-- Đã thêm 'async'
     if (_formKey.currentState!.validate()) {
       // Lấy dữ liệu từ TextEditingController
       final String customerName = _nameController.text.trim();
       final String phoneNumber = _phoneController.text.trim();
+      final int finalAmount = widget.totalAmount + 30000; // Tổng tiền + phí vận chuyển
       
       if (_paymentMethod == 1) {
         // COD - Hiển thị dialog xác nhận
@@ -508,10 +522,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const Icon(Icons.check_circle, color: Colors.green, size: 80),
                 const SizedBox(height: 20),
                 const Text("Đặt hàng thành công!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                 const SizedBox(height: 10),
-                 const Text("Giao đến:", style: TextStyle(color: Colors.grey)),
-                 const SizedBox(height: 5),
-                 Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                const Text("Giao đến:", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 5),
+                Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -533,15 +547,74 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => MomoPaymentScreen(
-              totalAmount: widget.totalAmount + 30000, // Tổng tiền + phí vận chuyển
+              totalAmount: finalAmount, // Tổng tiền + phí vận chuyển
               customerName: customerName,
               phoneNumber: phoneNumber,
             ),
           ),
         );
       } else if (_paymentMethod == 3) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tính năng VNPay đang phát triển...")));
+        // VNPAY - GỌI API BACKEND ĐỂ TẠO URL
+        await _createVnpayPaymentUrl(finalAmount); 
       }
+    }
+  }
+
+  // --- HÀM TẠO VNPAY URL BẰNG CÁCH GỌI API BACKEND ---
+  Future<void> _createVnpayPaymentUrl(int totalAmount) async {
+    // 1. Hiển thị loading
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.black)),
+    );
+    
+    // Tạo mã đơn hàng duy nhất (ví dụ)
+    final String orderId = DateTime.now().millisecondsSinceEpoch.toString().substring(0, 10);
+    final String orderInfo = "Thanh toan don hang #$orderId";
+
+    try {
+      final response = await http.post(
+        Uri.parse(backendApiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'amount': totalAmount, 
+          'orderId': orderId,
+          'orderInfo': orderInfo,
+        }),
+      );
+      
+      // Đóng dialog chờ
+      Navigator.pop(context); 
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['code'] == '00' && data['data'] != null) {
+          final String vnpayUrl = data['data'];
+
+          // 2. Điều hướng sang màn hình WebView VNPAY
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VnpayPaymentScreen(vnpayUrl: vnpayUrl),
+            ),
+          );
+          return;
+        }
+      }
+      
+      // Xử lý lỗi nếu Backend trả về lỗi hoặc status code không phải 200
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi Server Backend: ${response.statusCode}')),
+      );
+
+    } catch (e) {
+      // Đóng dialog chờ
+      Navigator.pop(context); 
+      // Xử lý lỗi kết nối
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi kết nối Backend. Vui lòng kiểm tra Server Node.js đang chạy ở cổng 3000 và IP: $backendApiUrl')),
+      );
     }
   }
 }
