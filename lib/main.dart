@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
 // Thay đổi đường dẫn import bên dưới tùy theo nơi bạn lưu file HomeScreen
 import 'features/home/screens/home_screen.dart'; 
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async{
+  // <--- THÊM DÒNG NÀY ĐỂ ĐẢM BẢO FIREBASE KHỞI TẠO ĐÚNG CÁCH
+  WidgetsFlutterBinding.ensureInitialized(); 
+  
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  // ... (Giữ nguyên code)
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Tắt chữ DEBUG đỏ ở góc phải
+      debugShowCheckedModeBanner: false, 
       title: 'Fashion Store',
       
-      // Cấu hình Giao diện chung (Global Theme)
-      // Chỉnh ở đây thì toàn bộ App sẽ thay đổi theo
       theme: ThemeData(
-        // Màu chủ đạo
         primaryColor: Colors.black,
-        
-        // Màu nền mặc định cho các màn hình (Trắng pha xám nhẹ cho hiện đại)
         scaffoldBackgroundColor: const Color(0xFFF9F9F9),
-        
-        // Cấu hình font chữ mặc định (nếu muốn dùng Google Fonts thì add sau)
         fontFamily: 'Roboto', 
-
-        // Cấu hình AppBar mặc định (Trong suốt, chữ đen)
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -39,21 +39,17 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold
           ),
         ),
-
-        // Cấu hình Nút bấm (ElevatedButton) mặc định là màu đen, bo góc
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black, // Màu nền nút
-            foregroundColor: Colors.white, // Màu chữ nút
+            backgroundColor: Colors.black, 
+            foregroundColor: Colors.white, 
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12), // Bo góc 12
+              borderRadius: BorderRadius.circular(12), 
             ),
           ),
         ),
-        
-        // Cấu hình ô nhập liệu (TextField)
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -62,8 +58,8 @@ class MyApp extends StatelessWidget {
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-             borderRadius: BorderRadius.circular(12),
-             borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -73,8 +69,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // Màn hình khởi động đầu tiên
-      home: HomeScreen(), 
+      home: const HomeScreen(), // Thêm const để tối ưu hóa
     );
   }
 }
