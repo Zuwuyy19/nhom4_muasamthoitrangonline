@@ -90,4 +90,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'shopquanao-69955.firebasestorage.app',
     measurementId: 'G-WFT1GB4R3T',
   );
+
 }

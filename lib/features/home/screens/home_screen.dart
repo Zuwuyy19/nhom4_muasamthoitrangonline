@@ -1,11 +1,16 @@
-// lib/home/screens/home_screen.dart
+// lib/features/home/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../product/widgets/product_card.dart';
 import '../../product/screens/product_detail_screen.dart';
 import '../../cart/screens/cart_screen.dart';
+
+// ✅ Auth screens (chỉnh path nếu khác)
+import '../../auth/screens/login_screen.dart';
+import '../../auth/screens/register_screen.dart';
 
 final DatabaseReference _productsRef = FirebaseDatabase.instance.ref('products');
 final DatabaseReference _categoriesRef = FirebaseDatabase.instance.ref('categories');
@@ -104,6 +109,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _accountTab() {
+    final user = FirebaseAuth.instance.currentUser;
+    final isGuest = (user == null);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 18),
+          const Icon(Icons.person_outline, size: 64, color: Colors.grey),
+          const SizedBox(height: 10),
+          Text(
+            isGuest ? 'Khách (Guest)' : 'Tài khoản',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isGuest
+                ? 'Bạn có thể mua hàng & thanh toán mà không cần đăng nhập.\n'
+                  'Đăng nhập để lưu đơn hàng, wishlist và thông tin giao hàng.'
+                : (user.email ?? ''),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey, height: 1.4),
+          ),
+          const SizedBox(height: 24),
+
+          if (isGuest) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                  if (!mounted) return;
+                  setState(() {}); // refresh lại tab sau khi quay về
+                },
+                child: const Text('Đăng nhập'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                  );
+                  if (!mounted) return;
+                  setState(() {}); // refresh lại tab sau khi quay về
+                },
+                child: const Text('Đăng ký'),
+              ),
+            ),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã đăng xuất')),
+                  );
+                  setState(() {});
+                },
+                child: const Text('Đăng xuất'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,7 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 top: 8,
                 child: Container(
                   padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
                   constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                   child: const Text(
                     '2',
@@ -179,16 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const CartScreen();
       case 3:
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.person_outline, size: 56, color: Colors.grey),
-              SizedBox(height: 8),
-              Text('Tài khoản', style: TextStyle(fontSize: 18)),
-            ],
-          ),
-        );
+        return _accountTab();
       default:
         return _homeContent();
     }
@@ -246,7 +325,12 @@ class _HomeScreenState extends State<HomeScreen> {
             stream: _productsRef.onValue,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: Padding(padding: EdgeInsets.only(top: 30), child: CircularProgressIndicator()));
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 30),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
               }
               if (snapshot.hasError) return _noData('Lỗi tải dữ liệu: ${snapshot.error}');
               final all = _parseProducts(snapshot.data?.snapshot.value);
