@@ -26,7 +26,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   
   // *** QUAN TRỌNG: ĐỊA CHỈ IP KẾT NỐI VỚI BACKEND NODE.JS ***
   // Dành cho Android Emulator:
-  final String backendApiUrl = 'http://172.17.151.114:3000/create_payment_url';
+  final String backendApiUrl = 'http://192.168.1.3:3000/create_payment_url';
   // Dành cho iOS Simulator: 'http://localhost:3000/create_payment_url'
   // -----------------------------------------------------------
 
