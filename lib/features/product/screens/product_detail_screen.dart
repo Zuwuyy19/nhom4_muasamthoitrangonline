@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../cart/services/cart_service.dart';
+import '../../cart/services/wishlist_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  // Nhận dữ liệu từ màn hình Home truyền sang
+  final String productId;
   final String name;
-  final String price;
-  final String imageUrl;
+  final int price;
+  final String thumbnail;
+  final String categoryId;
 
   const ProductDetailScreen({
     super.key,
+    required this.productId,
     required this.name,
     required this.price,
-    required this.imageUrl,
+    required this.thumbnail,
+    required this.categoryId,
   });
 
   @override
@@ -18,40 +25,97 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  // Biến lưu trạng thái người dùng đang chọn size/màu nào
   int selectedSizeIndex = 0;
   int selectedColorIndex = 0;
 
-  final List<String> sizes = ["S", "M", "L", "XL", "XXL"];
+  final List<String> sizes = ['S', 'M', 'L', 'XL', 'XXL'];
   final List<Color> colors = [
     Colors.black,
-    Colors.blue.shade900,
+    Colors.blue,
     Colors.brown,
     Colors.grey,
   ];
 
+  final CartService _cartService = CartService();
+  final WishlistService _wishlistService = WishlistService();
+
+  String _formatPrice(int value) {
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+  }
+
+  Future<void> _addToCart() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
+      );
+      return;
+    }
+
+    await _cartService.addOrUpdateItem(
+      uid: user.uid,
+      productId: widget.productId,
+      productName: widget.name,
+      price: widget.price,
+      quantity: 1,
+      thumbnail: widget.thumbnail,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Đã thêm ${widget.name} vào giỏ hàng')),
+    );
+  }
+
+  Future<void> _addToWishlist() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm yêu thích')),
+      );
+      return;
+    }
+
+    await _wishlistService.addItem(
+      uid: user.uid,
+      productId: widget.productId,
+      productName: widget.name,
+      price: widget.price,
+      thumbnail: widget.thumbnail,
+      categoryId: widget.categoryId,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Lấy kích thước màn hình để chia tỷ lệ layout
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      // Dùng Stack để ảnh nằm dưới, nội dung đè lên trên
       body: Stack(
         children: [
-          // 1. Ảnh nền full màn hình (chiếm 50% chiều cao)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: size.height * 0.5,
             child: Image.network(
-              widget.imageUrl,
+              widget.thumbnail,
               fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey.shade200,
+                alignment: Alignment.center,
+                child: const Icon(Icons.image_not_supported, size: 48),
+              ),
             ),
           ),
-
-          // 2. Nút Back và Yêu thích ở trên cùng
           Positioned(
             top: 50,
             left: 20,
@@ -59,7 +123,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Nút Back custom
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: Container(
@@ -71,24 +134,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: const Icon(Icons.arrow_back, color: Colors.black),
                   ),
                 ),
-                // Nút Yêu thích
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: _addToWishlist,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.favorite_border, color: Colors.black),
                   ),
-                  child: const Icon(Icons.favorite_border, color: Colors.black),
                 ),
               ],
             ),
           ),
-
-          // 3. Panel Thông tin sản phẩm (Trượt từ dưới lên)
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              height: size.height * 0.55, // Chiếm 55% màn hình dưới
+              height: size.height * 0.55,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -100,7 +163,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tên và Giá
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,21 +178,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 5),
-                            const Text("Áo thun phong cách Unisex", style: TextStyle(color: Colors.grey)),
+                            const Text('Mô tả sản phẩm', style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
                       Text(
-                        widget.price,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+                        '${_formatPrice(widget.price)}đ',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 25),
-
-                  // Chọn Size
-                  const Text("Chọn Size", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Chọn size', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 10),
                   Row(
                     children: List.generate(sizes.length, (index) {
@@ -145,7 +204,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           width: 45,
                           height: 45,
                           decoration: BoxDecoration(
-                            // Logic đổi màu khi được chọn
                             color: selectedSizeIndex == index ? Colors.black : Colors.white,
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
@@ -163,11 +221,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       );
                     }),
                   ),
-
                   const SizedBox(height: 25),
-
-                  // Chọn Màu
-                  const Text("Chọn Màu", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Chọn màu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 10),
                   Row(
                     children: List.generate(colors.length, (index) {
@@ -179,11 +234,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         },
                         child: Container(
                           margin: const EdgeInsets.only(right: 15),
-                          padding: const EdgeInsets.all(3), // Tạo viền bao quanh
+                          padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              // Viền cam nếu đang chọn, trong suốt nếu không chọn
                               color: selectedColorIndex == index ? Colors.orange : Colors.transparent,
                               width: 2,
                             ),
@@ -200,25 +254,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       );
                     }),
                   ),
-
-                  const Spacer(), // Đẩy nút mua hàng xuống đáy
-
-                  // Nút Thêm vào giỏ hàng
+                  const Spacer(),
                   SizedBox(
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Xử lý thêm vào giỏ hàng tại đây
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Đã thêm size ${sizes[selectedSizeIndex]} vào giỏ!"))
-                        );
-                      },
+                      onPressed: _addToCart,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      child: const Text("Thêm vào giỏ hàng", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Thêm vào giỏ hàng',
+                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   )
                 ],

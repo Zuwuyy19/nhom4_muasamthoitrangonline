@@ -5,6 +5,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart'; // Thư viện GPS
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/cart_models.dart';
+import '../services/cart_service.dart';
+import '../services/order_service.dart';
 import '../../home/screens/home_screen.dart';
 import 'momo_payment_screen.dart'; 
 import 'vnpay_payment_screen.dart'; // <-- THÊM IMPORT VNPAY
@@ -22,7 +26,10 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
-  int _paymentMethod = 1; 
+  int _paymentMethod = 1;
+
+  final CartService _cartService = CartService();
+  final OrderService _orderService = OrderService(); 
   
   // *** QUAN TRỌNG: ĐỊA CHỈ IP KẾT NỐI VỚI BACKEND NODE.JS ***
   // Dành cho Android Emulator:
@@ -502,61 +509,116 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
   
   // --- HÀM XỬ LÝ ĐẶT HÀNG ---
-  void _handleOrder() async { // <-- Đã thêm 'async'
-    if (_formKey.currentState!.validate()) {
-      // Lấy dữ liệu từ TextEditingController
-      final String customerName = _nameController.text.trim();
-      final String phoneNumber = _phoneController.text.trim();
-      final int finalAmount = widget.totalAmount + 30000; // Tổng tiền + phí vận chuyển
-      
-      if (_paymentMethod == 1) {
-        // COD - Hiển thị dialog xác nhận
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 80),
-                const SizedBox(height: 20),
-                const Text("Đặt hàng thành công!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                const Text("Giao đến:", style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 5),
-                Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const HomeScreen()), (route) => false);
-                    },
-                    child: const Text("Tiếp tục mua sắm", style: TextStyle(color: Colors.white)),
-                  ),
-                )
-              ],
-            ),
+  void _handleOrder() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để đặt hàng')),
+      );
+      return;
+    }
+
+    final cartItems = await _cartService.fetchCart(user.uid);
+    if (cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Giỏ hàng đang trống')),
+      );
+      return;
+    }
+
+    final String customerName = _nameController.text.trim();
+    final int finalAmount = widget.totalAmount + 30000;
+
+    final paymentMethod = switch (_paymentMethod) {
+      1 => 'COD',
+      2 => 'Momo',
+      3 => 'VNPay',
+      _ => 'COD',
+    };
+
+    final paymentStatus = paymentMethod == 'COD' ? 'unpaid' : 'pending';
+    final orderItems = cartItems
+        .map(
+          (item) => OrderItem(
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+            thumbnail: item.thumbnail,
           ),
-        );
-      } else if (_paymentMethod == 2) {
-        // MoMo - Điều hướng tới MoMo payment screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MomoPaymentScreen(
-              totalAmount: finalAmount, // Tổng tiền + phí vận chuyển
-              customerName: customerName,
-              phoneNumber: phoneNumber,
-            ),
+        )
+        .toList();
+
+    await _orderService.createOrder(
+      userId: user.uid,
+      userName: customerName,
+      totalAmount: finalAmount,
+      status: 'pending',
+      items: orderItems,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+    );
+
+    await _cartService.clearCart(user.uid);
+
+    if (_paymentMethod == 1) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 80),
+              const SizedBox(height: 20),
+              const Text('Đặt hàng thành công!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              const Text('Giao đến:', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 5),
+              Text(_addressName, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                      (route) => false,
+                    );
+                  },
+                  child: const Text('Tiếp tục mua sắm', style: TextStyle(color: Colors.white)),
+                ),
+              )
+            ],
           ),
-        );
-      } else if (_paymentMethod == 3) {
-        // VNPAY - GỌI API BACKEND ĐỂ TẠO URL
-        await _createVnpayPaymentUrl(finalAmount); 
-      }
+        ),
+      );
+      return;
+    }
+
+    if (_paymentMethod == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MomoPaymentScreen(
+            totalAmount: finalAmount,
+            customerName: customerName,
+            phoneNumber: _phoneController.text.trim(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_paymentMethod == 3) {
+      await _createVnpayPaymentUrl(finalAmount);
     }
   }
 

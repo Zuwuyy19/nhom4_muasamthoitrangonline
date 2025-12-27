@@ -5,6 +5,13 @@ import 'package:firebase_database/firebase_database.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../auth/screens/register_screen.dart';
 import '../../home/screens/home_screen.dart';
+import '../../cart/models/cart_models.dart';
+import '../../cart/services/wishlist_service.dart';
+import '../../cart/services/order_service.dart';
+import 'order_history_screen.dart';
+import 'pending_orders_screen.dart';
+import 'processing_orders_screen.dart';
+import 'wishlist_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,9 +22,13 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
+  final WishlistService _wishlistService = WishlistService();
+  final OrderService _orderService = OrderService();
 
   void _showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openLogin() async {
@@ -139,7 +150,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'phone': phoneCtrl.text.trim(),
         'address': addressCtrl.text.trim(),
       });
-      await FirebaseAuth.instance.currentUser?.updateDisplayName(nameCtrl.text.trim());
+      await FirebaseAuth.instance.currentUser?.updateDisplayName(
+        nameCtrl.text.trim(),
+      );
       if (!mounted) return;
       _showMessage(context, 'Đã cập nhật thông tin');
       setState(() {});
@@ -231,9 +244,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 16),
               _QuickStatsRow(
-                onCart: () => _requireLogin('xem giỏ hàng'),
+                wishlistCount: '0',
+                pendingCount: '0',
+                processingCount: '0',
+                onCart: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                ),
+                onPendingConfirm: () =>
+                    _requireLogin('xem đơn hàng chờ xác nhận'),
                 onShipping: () => _requireLogin('xem đơn chờ giao'),
-                onRating: () => _requireLogin('xem đánh giá'),
               ),
               const SizedBox(height: 20),
               const _SectionHeader(title: 'Tài khoản'),
@@ -267,7 +287,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Đơn hàng đang xử lý',
                 subtitle: 'Theo dõi trạng thái vận chuyển',
                 icon: Icons.local_shipping_outlined,
-                onTap: () => _requireLogin('xem đơn hàng đang xử lý'),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProcessingOrdersScreen(),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               const _SectionHeader(title: 'Hỗ trợ'),
@@ -301,7 +326,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       stream: _usersRef.child(uid).onValue,
       builder: (context, snapshot) {
         final data = _mapFromSnapshot(snapshot.data?.snapshot.value);
-        final fullName = _getString(data, 'fullName', user.displayName ?? 'HUTECH Member');
+        final fullName = _getString(
+          data,
+          'fullName',
+          user.displayName ?? 'HUTECH Member',
+        );
         final email = _getString(data, 'email', user.email ?? '');
         final phone = _getString(data, 'phone', '---');
         final address = _getString(data, 'address', '---');
@@ -346,10 +375,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onRegister: _openRegister,
                 ),
                 const SizedBox(height: 16),
-                _QuickStatsRow(
-                  onCart: () => _showMessage(context, 'Mở giỏ hàng'),
-                  onShipping: () => _showMessage(context, 'Xem đơn chờ giao'),
-                  onRating: () => _showMessage(context, 'Xem đánh giá'),
+                StreamBuilder<List<WishlistItem>>(
+                  stream: _wishlistService.watchWishlist(uid),
+                  builder: (context, snapshot) {
+                    final count = (snapshot.data ?? []).length;
+                    return StreamBuilder<List<OrderModel>>(
+                      stream: _orderService.watchOrdersByUser(uid),
+                      builder: (context, orderSnapshot) {
+                        final orders = orderSnapshot.data ?? [];
+                        final pendingCount = orders
+                            .where((o) => o.status == 'pending')
+                            .length;
+                        final processingCount = orders
+                            .where((o) => o.status == 'processing')
+                            .length;
+                        return _QuickStatsRow(
+                          wishlistCount: count.toString(),
+                          pendingCount: pendingCount.toString(),
+                          processingCount: processingCount.toString(),
+                          onCart: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WishlistScreen(),
+                            ),
+                          ),
+                          onPendingConfirm: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PendingOrdersScreen(),
+                            ),
+                          ),
+                          onShipping: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProcessingOrdersScreen(),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 const _SectionHeader(title: 'Tài khoản'),
@@ -387,13 +452,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: 'Lịch sử đơn hàng',
                   subtitle: 'Xem chi tiết các đơn đã mua',
                   icon: Icons.receipt_long_outlined,
-                  onTap: () => _showMessage(context, 'Xem lịch sử đơn hàng'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderHistoryScreen(),
+                    ),
+                  ),
                 ),
                 _ProfileTile(
                   title: 'Đơn hàng đang xử lý',
                   subtitle: 'Theo dõi trạng thái vận chuyển',
                   icon: Icons.local_shipping_outlined,
-                  onTap: () => _showMessage(context, 'Xem đơn hàng đang xử lý'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProcessingOrdersScreen(),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const _SectionHeader(title: 'Hỗ trợ'),
@@ -475,10 +550,7 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: const TextStyle(color: Colors.white70),
-                ),
+                Text(email, style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 12),
                 if (isGuest)
                   Row(
@@ -527,14 +599,20 @@ class _ProfileHeader extends StatelessWidget {
 
 class _QuickStatsRow extends StatelessWidget {
   const _QuickStatsRow({
+    required this.wishlistCount,
+    required this.pendingCount,
+    required this.processingCount,
     required this.onCart,
+    required this.onPendingConfirm,
     required this.onShipping,
-    required this.onRating,
   });
 
+  final String wishlistCount;
+  final String pendingCount;
+  final String processingCount;
   final VoidCallback onCart;
+  final VoidCallback onPendingConfirm;
   final VoidCallback onShipping;
-  final VoidCallback onRating;
 
   @override
   Widget build(BuildContext context) {
@@ -542,28 +620,28 @@ class _QuickStatsRow extends StatelessWidget {
       children: [
         Expanded(
           child: _ActionCard(
-            title: 'Giỏ hàng',
-            value: '2',
-            icon: Icons.shopping_bag_outlined,
+            title: 'Wishlist',
+            value: wishlistCount,
+            icon: Icons.favorite_border,
             onTap: onCart,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _ActionCard(
-            title: 'Chờ giao',
-            value: '1',
-            icon: Icons.local_shipping_outlined,
-            onTap: onShipping,
+            title: 'Chờ xác nhận',
+            value: pendingCount,
+            icon: Icons.fact_check_outlined,
+            onTap: onPendingConfirm,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _ActionCard(
-            title: 'Đánh giá',
-            value: '4.8',
-            icon: Icons.star_outline,
-            onTap: onRating,
+            title: 'Chờ giao',
+            value: processingCount,
+            icon: Icons.local_shipping_outlined,
+            onTap: onShipping,
           ),
         ),
       ],
@@ -670,10 +748,7 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(color: Colors.black54),
-          ),
+          Text(value, style: const TextStyle(color: Colors.black54)),
         ],
       ),
     );

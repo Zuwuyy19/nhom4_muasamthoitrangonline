@@ -2,16 +2,23 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../product/widgets/product_card.dart';
 import '../../product/screens/product_detail_screen.dart';
 import '../../cart/screens/cart_screen.dart';
+import '../../cart/models/cart_models.dart';
+import '../../cart/services/cart_service.dart';
 
 // Profile screen
 import '../../profile/screens/profile_screen.dart';
 
-final DatabaseReference _productsRef = FirebaseDatabase.instance.ref('products');
-final DatabaseReference _categoriesRef = FirebaseDatabase.instance.ref('categories');
+final DatabaseReference _productsRef = FirebaseDatabase.instance.ref(
+  'products',
+);
+final DatabaseReference _categoriesRef = FirebaseDatabase.instance.ref(
+  'categories',
+);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final CartService _cartService = CartService();
 
   // Trang Sản phẩm (tab index 1)
   String _selectedCategoryKey = 'all';
@@ -45,8 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
           final productData = Map<String, dynamic>.from(value);
 
           final name = (productData["name"] ?? "Sản phẩm").toString();
-          final image = (productData["image"] ?? "").toString();
-          final categoryKey = (productData["category"] ?? "all").toString();
+          final thumbnail =
+              (productData["thumbnail"] ?? productData["image"] ?? "")
+                  .toString();
+          final categoryId =
+              (productData["categoryId"] ?? productData["category"] ?? "all")
+                  .toString();
 
           final priceRaw = productData["price"] ?? 0;
           final int priceInt = int.tryParse(priceRaw.toString()) ?? 0;
@@ -58,9 +70,10 @@ class _HomeScreenState extends State<HomeScreen> {
           loaded.add({
             "id": id,
             "name": name,
-            "image": image,
-            "price": "${formattedPrice}đ",
-            "category": categoryKey,
+            "thumbnail": thumbnail,
+            "price": priceInt,
+            "priceText": "${formattedPrice}đ",
+            "categoryId": categoryId,
           });
         }
       });
@@ -74,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     if (categoryKey == 'all') return products;
     return products
-        .where((p) => (p["category"] ?? "").toString() == categoryKey)
+        .where((p) => (p["categoryId"] ?? "").toString() == categoryKey)
         .toList();
   }
 
@@ -83,9 +96,11 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
+          productId: (product["id"] ?? "").toString(),
           name: product["name"] ?? "Sản phẩm",
-          price: product["price"] ?? "N/A",
-          imageUrl: product["image"] ?? "",
+          price: product["price"] is int ? product["price"] as int : 0,
+          thumbnail: (product["thumbnail"] ?? "").toString(),
+          categoryId: (product["categoryId"] ?? "all").toString(),
         ),
       ),
     );
@@ -132,33 +147,58 @@ class _HomeScreenState extends State<HomeScreen> {
           Stack(
             children: [
               IconButton(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const CartScreen()),
                   );
+                  if (!mounted) return;
+                  if (result == 'go_products') {
+                    setState(() => _selectedIndex = 1);
+                  }
                 },
                 icon: const Icon(Icons.shopping_bag_outlined),
               ),
               Positioned(
                 right: 8,
                 top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: const Text(
-                    '2',
-                    style: TextStyle(color: Colors.white, fontSize: 10),
-                    textAlign: TextAlign.center,
-                  ),
+                child: StreamBuilder<List<CartItem>>(
+                  stream: FirebaseAuth.instance.currentUser == null
+                      ? null
+                      : _cartService.watchCart(
+                          FirebaseAuth.instance.currentUser!.uid,
+                        ),
+                  builder: (context, snapshot) {
+                    final items = snapshot.data ?? [];
+                    final count = items.fold<int>(
+                      0,
+                      (sum, item) => sum + item.quantity,
+                    );
+                    if (count == 0) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        count > 99 ? '99+' : count.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  },
                 ),
-              )
+              ),
             ],
-          )
+          ),
         ],
       ),
       body: _pageForIndex(_selectedIndex),
@@ -167,10 +207,22 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-          BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), label: 'Sản phẩm'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: 'Giỏ hàng'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Tài khoản'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Trang chủ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.grid_view_outlined),
+            label: 'Sản phẩm',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag_outlined),
+            label: 'Giỏ hàng',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Tài khoản',
+          ),
         ],
       ),
     );
@@ -183,7 +235,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return _productsPageWithCategories();
       case 2:
-        return const CartScreen();
+        return CartScreen(
+          onGoShopping: () => setState(() => _selectedIndex = 1),
+        );
       case 3:
         return const ProfileScreen();
       default:
@@ -215,11 +269,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
+                const Text(
+                  "Bộ sưu tập mới",
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
                 const SizedBox(height: 5),
                 const Text(
                   "GIẢM GIÁ\nMÙA HÈ 50%",
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const Spacer(),
                 ElevatedButton(
@@ -227,17 +288,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text("Xem sản phẩm", style: TextStyle(fontSize: 12)),
-                )
+                  child: const Text(
+                    "Xem sản phẩm",
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 18),
-          const Text("Sản phẩm", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            "Sản phẩm",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
           StreamBuilder<DatabaseEvent>(
             stream: _productsRef.onValue,
@@ -250,7 +320,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }
-              if (snapshot.hasError) return _noData('Lỗi tải dữ liệu: ${snapshot.error}');
+              if (snapshot.hasError)
+                return _noData('Lỗi tải dữ liệu: ${snapshot.error}');
               final all = _parseProducts(snapshot.data?.snapshot.value);
               if (all.isEmpty) return _noData('Chưa có sản phẩm.');
               return GridView.builder(
@@ -267,8 +338,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   final p = all[i];
                   return ProductCard(
                     title: p["name"] ?? "Sản phẩm",
-                    price: p["price"] ?? "N/A",
-                    imageUrl: p["image"] ?? "",
+                    price: p["priceText"] ?? "N/A",
+                    imageUrl: p["thumbnail"] ?? "",
                     onTap: () => _openDetail(p),
                   );
                 },
@@ -294,7 +365,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 );
               }
-              if (snap.hasError) return _noData('Lỗi tải danh mục: ${snap.error}');
+              if (snap.hasError)
+                return _noData('Lỗi tải danh mục: ${snap.error}');
 
               final categories = _parseCategories(snap.data?.snapshot.value);
 
@@ -331,7 +403,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       selected: selected,
                       selectedColor: Colors.black,
                       backgroundColor: Colors.white,
-                      onSelected: (_) => setState(() => _selectedCategoryKey = key),
+                      onSelected: (_) =>
+                          setState(() => _selectedCategoryKey = key),
                       shape: StadiumBorder(
                         side: BorderSide(color: Colors.grey.shade300),
                       ),
@@ -349,12 +422,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError) return _noData('Lỗi tải sản phẩm: ${snapshot.error}');
+                if (snapshot.hasError)
+                  return _noData('Lỗi tải sản phẩm: ${snapshot.error}');
 
-                final allProducts = _parseProducts(snapshot.data?.snapshot.value);
-                final filtered = _filterByCategory(allProducts, _selectedCategoryKey);
+                final allProducts = _parseProducts(
+                  snapshot.data?.snapshot.value,
+                );
+                final filtered = _filterByCategory(
+                  allProducts,
+                  _selectedCategoryKey,
+                );
 
-                if (filtered.isEmpty) return _noData('Không có sản phẩm trong danh mục này.');
+                if (filtered.isEmpty)
+                  return _noData('Không có sản phẩm trong danh mục này.');
 
                 return GridView.builder(
                   itemCount: filtered.length,
@@ -368,8 +448,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     final p = filtered[i];
                     return ProductCard(
                       title: p["name"] ?? "Sản phẩm",
-                      price: p["price"] ?? "N/A",
-                      imageUrl: p["image"] ?? "",
+                      price: p["priceText"] ?? "N/A",
+                      imageUrl: p["thumbnail"] ?? "",
                       onTap: () => _openDetail(p),
                     );
                   },
