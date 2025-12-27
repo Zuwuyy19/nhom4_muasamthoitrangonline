@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../auth_service.dart';
 import 'register_screen.dart';
+import '../../home/screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,8 +56,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Đăng nhập thành công!")),
       );
-
-      // ✅ Không cần push Home nếu bạn dùng AuthGate trong main.dart
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     } on FirebaseAuthException catch (e) {
       final msg = switch (e.code) {
         "user-not-found" => "Không tìm thấy tài khoản",
