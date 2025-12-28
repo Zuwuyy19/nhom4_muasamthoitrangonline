@@ -6,8 +6,8 @@ import '../../cart/models/cart_models.dart';
 import '../../cart/services/order_service.dart';
 import 'order_detail_screen.dart';
 
-class OrderHistoryScreen extends StatelessWidget {
-  const OrderHistoryScreen({super.key});
+class PendingOrdersScreen extends StatelessWidget {
+  const PendingOrdersScreen({super.key});
 
   String _formatPrice(int value) {
     return value.toString().replaceAllMapped(
@@ -29,12 +29,12 @@ class OrderHistoryScreen extends StatelessWidget {
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Lịch sử đơn hàng')),
+        appBar: AppBar(title: const Text('Đơn hàng chờ xác nhận')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Vui lòng đăng nhập để xem lịch sử đơn hàng'),
+              const Text('Vui lòng đăng nhập để xem đơn hàng'),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
@@ -53,15 +53,15 @@ class OrderHistoryScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lịch sử đơn hàng'),
+        title: const Text('Đơn hàng chờ xác nhận'),
         centerTitle: true,
       ),
       body: StreamBuilder<List<OrderModel>>(
         stream: orderService.watchOrdersByUser(user.uid),
         builder: (context, snapshot) {
-          final orders = snapshot.data ?? [];
+          final orders = (snapshot.data ?? []).where((o) => o.status == 'pending').toList();
           if (orders.isEmpty) {
-            return const Center(child: Text('Chưa có đơn hàng nào'));
+            return const Center(child: Text('Chưa có đơn hàng chờ xác nhận'));
           }
 
           return ListView.separated(

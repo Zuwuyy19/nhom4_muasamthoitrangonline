@@ -38,8 +38,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
           final productData = Map<String, dynamic>.from(value);
 
           final name = (productData["name"] ?? "Sản phẩm").toString();
-          final image = (productData["image"] ?? "").toString();
-          final categoryKey = (productData["category"] ?? "all").toString();
+          final thumbnail = (productData["thumbnail"] ?? productData["image"] ?? "").toString();
+          final categoryId = (productData["categoryId"] ?? productData["category"] ?? "all").toString();
 
           final priceRaw = productData["price"] ?? 0;
           final int priceInt = int.tryParse(priceRaw.toString()) ?? 0;
@@ -51,9 +51,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
           loaded.add({
             "id": id,
             "name": name,
-            "image": image,
-            "price": "${formattedPrice}đ",
-            "category": categoryKey,
+            "thumbnail": thumbnail,
+            "price": priceInt,
+            "priceText": "${formattedPrice}đ",
+            "categoryId": categoryId,
           });
         }
       });
@@ -63,7 +64,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   List<Map<String, dynamic>> _filterByCategory(List<Map<String, dynamic>> products) {
     if (_selectedCategoryKey == 'all') return products;
-    return products.where((p) => (p["category"] ?? "").toString() == _selectedCategoryKey).toList();
+    return products.where((p) => (p["categoryId"] ?? "").toString() == _selectedCategoryKey).toList();
   }
 
   void _openDetail(Map<String, dynamic> product) {
@@ -71,9 +72,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
+          productId: (product["id"] ?? "").toString(),
           name: product["name"] ?? "Sản phẩm",
-          price: product["price"] ?? "N/A",
-          imageUrl: product["image"] ?? "",
+          price: product["price"] is int ? product["price"] as int : 0,
+          thumbnail: (product["thumbnail"] ?? "").toString(),
+          categoryId: (product["categoryId"] ?? "all").toString(),
         ),
       ),
     );
@@ -188,8 +191,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       final p = filtered[i];
                       return ProductCard(
                         title: p["name"] ?? "Sản phẩm",
-                        price: p["price"] ?? "N/A",
-                        imageUrl: p["image"] ?? "",
+                        price: p["priceText"] ?? "N/A",
+                        imageUrl: p["thumbnail"] ?? "",
                         onTap: () => _openDetail(p),
                       );
                     },
