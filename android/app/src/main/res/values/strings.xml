@@ -1,0 +1,4 @@
+<resources>
+    <!-- Web Client ID lấy từ Firebase Console → Project Settings → Web App -->
+    <string name="default_web_client_id">1:904040468234:android:2dcee173a561386696b4f3.apps.googleusercontent.com</string>
+</resources>
