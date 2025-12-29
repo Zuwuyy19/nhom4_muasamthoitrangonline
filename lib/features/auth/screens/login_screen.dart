@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
 import '../auth_service.dart';
 import 'register_screen.dart';
 import '../../home/screens/home_screen.dart';
@@ -60,17 +58,6 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
-    } on FirebaseAuthException catch (e) {
-      final msg = switch (e.code) {
-        "user-not-found" => "Không tìm thấy tài khoản",
-        "wrong-password" => "Sai mật khẩu",
-        "invalid-email" => "Email không hợp lệ",
-        "invalid-credential" => "Thông tin đăng nhập không đúng",
-        _ => "Đăng nhập thất bại: ${e.message ?? e.code}",
-      };
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,10 +68,38 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  InputDecoration _decor(String label, {IconData? icon}) {
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _loading = true);
+    try {
+      final cred = await _authService.loginWithGoogle();
+      if (cred == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Người dùng hủy đăng nhập Google")),
+        );
+        return;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đăng nhập Google thành công!")),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Lỗi Google Sign-In: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  InputDecoration _decor(String label) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: icon == null ? null : Icon(icon),
       border: const OutlineInputBorder(),
     );
   }
@@ -102,17 +117,21 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 TextFormField(
                   controller: _emailCtrl,
-                  decoration: _decor("Email", icon: Icons.email),
+                  decoration: _decor("Email"),
                   keyboardType: TextInputType.emailAddress,
                   validator: _emailValidator,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _passwordCtrl,
-                  decoration: _decor("Mật khẩu", icon: Icons.lock).copyWith(
+                  decoration: _decor("Mật khẩu").copyWith(
                     suffixIcon: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
                     ),
                   ),
                   obscureText: _obscure,
@@ -125,12 +144,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _loading ? null : _handleLogin,
                     child: _loading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                        ? const CircularProgressIndicator()
                         : const Text("Đăng nhập"),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: _loading ? null : _handleGoogleLogin,
+                    child: const Text(
+                      "Đăng nhập bằng Google",
+                      style: TextStyle(fontSize: 16),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -139,7 +166,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? null
                       : () => Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
                           ),
                   child: const Text("Chưa có tài khoản? Đăng ký"),
                 ),
