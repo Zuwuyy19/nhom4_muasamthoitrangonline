@@ -56,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Đăng nhập thành công!")),
       );
+
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
@@ -75,6 +76,36 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Lỗi: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // ✅ NEW: Login Google
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _loading = true);
+    try {
+      await _authService.signInWithGoogle();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đăng nhập Google thành công!")),
+      );
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      // Một số lỗi FirebaseAuth có thể xuất hiện khi signInWithCredential
+      final msg = "Đăng nhập Google thất bại: ${e.message ?? e.code}";
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Google Sign-In lỗi: $e")),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -112,13 +143,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: _decor("Mật khẩu", icon: Icons.lock).copyWith(
                     suffixIcon: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(
+                        _obscure ? Icons.visibility : Icons.visibility_off,
+                      ),
                     ),
                   ),
                   obscureText: _obscure,
                   validator: _passwordValidator,
                 ),
                 const SizedBox(height: 18),
+
+                // ✅ Button đăng nhập Email/Password
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -133,13 +168,30 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text("Đăng nhập"),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
+                // ✅ Button đăng nhập Google
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _handleGoogleLogin,
+                    icon: const Icon(Icons.g_mobiledata),
+                    label: const Text("Đăng nhập với Google"),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
                 TextButton(
                   onPressed: _loading
                       ? null
                       : () => Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
                           ),
                   child: const Text("Chưa có tài khoản? Đăng ký"),
                 ),

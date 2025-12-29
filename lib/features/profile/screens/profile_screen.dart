@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../../auth/auth_service.dart';
 
 import '../../auth/screens/login_screen.dart';
 import '../../auth/screens/register_screen.dart';
@@ -49,14 +50,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {});
   }
 
-  Future<void> _handleSignOut() async {
-    await FirebaseAuth.instance.signOut();
+Future<void> _handleSignOut() async {
+  try {
+    await AuthService().logout(); // ✅ logout cả Google + Firebase
+
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (route) => false,
     );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Đăng xuất lỗi: $e")),
+    );
   }
+}
 
   void _requireLogin(String action) {
     _showMessage(context, 'Vui lòng đăng nhập để $action');
