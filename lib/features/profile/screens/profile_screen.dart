@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../../auth/auth_service.dart';
 
 import '../../auth/screens/login_screen.dart';
 import '../../auth/screens/register_screen.dart';
@@ -49,14 +50,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {});
   }
 
-  Future<void> _handleSignOut() async {
-    await FirebaseAuth.instance.signOut();
+Future<void> _handleSignOut() async {
+  try {
+    await AuthService().logout(); // ✅ logout cả Google + Firebase
+
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (route) => false,
     );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Đăng xuất lỗi: $e")),
+    );
   }
+}
 
   void _requireLogin(String action) {
     _showMessage(context, 'Vui lòng đăng nhập để $action');
@@ -86,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
+shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
@@ -178,7 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _formatCreatedAt(Map<String, dynamic> data) {
     final raw = data['createdAt'];
     final millis = int.tryParse(raw?.toString() ?? '');
-    if (millis == null) return '---';
+if (millis == null) return '---';
     final dt = DateTime.fromMillisecondsSinceEpoch(millis);
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
@@ -260,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _ProfileTile(
                 title: 'Chỉnh sửa thông tin cá nhân',
                 subtitle: 'Cập nhật tên, email, số điện thoại',
-                icon: Icons.person_outline,
+icon: Icons.person_outline,
                 onTap: () => _requireLogin('chỉnh sửa thông tin'),
               ),
               _ProfileTile(
@@ -338,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final createdAt = _formatCreatedAt(data);
 
         return Scaffold(
-          appBar: AppBar(
+appBar: AppBar(
             title: const Text('Hồ sơ'),
             actions: [
               IconButton(
@@ -407,7 +416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           onShipping: () => Navigator.push(
                             context,
-                            MaterialPageRoute(
+MaterialPageRoute(
                               builder: (_) => const ProcessingOrdersScreen(),
                             ),
                           ),
@@ -479,7 +488,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () => _showMessage(context, 'Mở trung tâm trợ giúp'),
                 ),
                 _ProfileTile(
-                  title: 'Cài đặt',
+title: 'Cài đặt',
                   subtitle: 'Thông báo, bảo mật, ngôn ngữ',
                   icon: Icons.settings_outlined,
                   onTap: () => _showMessage(context, 'Mở cài đặt'),
@@ -571,7 +580,7 @@ class _ProfileHeader extends StatelessWidget {
                           onPressed: onRegister,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
+side: const BorderSide(color: Colors.white54),
                           ),
                           child: const Text('Đăng ký'),
                         ),
@@ -683,7 +692,7 @@ class _ActionCard extends StatelessWidget {
         child: Column(
           children: [
             Icon(icon, color: Colors.black87),
-            const SizedBox(height: 8),
+const SizedBox(height: 8),
             Text(
               value,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
