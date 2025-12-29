@@ -13,7 +13,20 @@
           "package_name": "com.example.nhom4_muasamthoitrangonline"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "904040468234-lfqtl7184mmiddt0kkk1gro5oet5jfaq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nhom4_muasamthoitrangonline",
+            "certificate_hash": "2f04ba9be3bfe4741e7da942076ad4b1177bdb96"
+          }
+        },
+        {
+          "client_id": "904040468234-g84poenaql964rmparn3d3c23c9eisvu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDb8RoBdsg67FzPu2NAx52K6w9rGO6oi_U"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "904040468234-g84poenaql964rmparn3d3c23c9eisvu.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "904040468234-h5jeob5a9cs68ji4slekj3a1tehj1fif.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nhom4Muasamthoitrangonline"
+              }
+            }
+          ]
         }
       }
     }
