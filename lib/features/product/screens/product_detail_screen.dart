@@ -11,9 +11,9 @@ class ProductDetailScreen extends StatefulWidget {
   final String thumbnail;
   final String categoryId;
 
-  // ✅ mới: variants + sizes (optional nhưng mình để required để chắc chắn)
+  // variants + sizes
   final Map<String, dynamic> variants; // { "white": {label, thumbnail, images: []}, ... }
-  final List<String> sizes; // ["S","M"...] hoặc []
+  final List<String> sizes; // ["S","M"...] hoặc ["27","27.5","EU 42"]...
 
   const ProductDetailScreen({
     super.key,
@@ -33,7 +33,6 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int selectedSizeIndex = 0;
 
-  // ✅ màu: chọn theo key của variant (white/black...)
   String? _selectedVariantKey;
 
   final CartService _cartService = CartService();
@@ -45,8 +44,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
-
-    // chọn variant đầu tiên nếu có
     if (widget.variants.isNotEmpty) {
       _selectedVariantKey = widget.variants.keys.first;
     }
@@ -66,7 +63,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   List<String> _imagesForSelectedVariant() {
-    // Nếu có variants: lấy images theo variant đang chọn
     if (widget.variants.isNotEmpty && _selectedVariantKey != null) {
       final v = widget.variants[_selectedVariantKey];
       if (v is Map) {
@@ -81,7 +77,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
     }
 
-    // fallback: dùng thumbnail cũ
     final fb = widget.thumbnail.trim();
     return fb.isNotEmpty ? [fb] : [];
   }
@@ -91,7 +86,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (v is Map) {
       final t = (v["thumbnail"] ?? "").toString().trim();
       if (t.isNotEmpty) return t;
-      // nếu không có thumbnail thì lấy ảnh đầu trong images
+
       final raw = v["images"];
       if (raw is List && raw.isNotEmpty) {
         final first = (raw.first ?? "").toString().trim();
@@ -163,7 +158,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final size = MediaQuery.of(context).size;
 
     final images = _imagesForSelectedVariant();
-    // đảm bảo index hợp lệ
     if (_activeImageIndex >= images.length) _activeImageIndex = 0;
 
     final hasSizes = widget.sizes.isNotEmpty;
@@ -172,7 +166,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // ✅ slider ảnh theo màu
+          // Slider ảnh theo màu
           Positioned(
             top: 0,
             left: 0,
@@ -197,7 +191,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     );
                   },
                 ),
-                // indicator
                 if (images.length > 1)
                   Positioned(
                     left: 0,
@@ -224,7 +217,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // top buttons
+          // Top buttons
           Positioned(
             top: 50,
             left: 20,
@@ -258,7 +251,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // bottom sheet
+          // Bottom sheet
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -268,13 +261,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
                 boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -5))
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 20,
+                    offset: Offset(0, -5),
+                  )
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // name + price
+                  // Name + price
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,26 +282,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             Text(
                               widget.name,
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 5),
-                            const Text('Mô tả sản phẩm', style: TextStyle(color: Colors.grey)),
+                            const Text(
+                              'Mô tả sản phẩm',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
                       Text(
                         '${_formatPrice(widget.price)}đ',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
 
-                  // ✅ chọn màu bằng thumbnail
+                  // Chọn màu bằng thumbnail
                   if (hasVariants) ...[
                     const SizedBox(height: 18),
-                    const Text('Màu sắc', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text(
+                      'Màu sắc',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 64,
@@ -324,31 +333,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               });
                               _pageCtrl.jumpToPage(0);
                             },
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: selected ? Colors.orange : Colors.grey.shade300,
-                                      width: selected ? 2 : 1,
-                                    ),
-                                  ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: Image.network(
-                                    _thumbnailForVariant(key),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade200,
-                                      alignment: Alignment.center,
-                                      child: const Icon(Icons.broken_image),
-                                    ),
-                                  ),
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selected ? Colors.orange : Colors.grey.shade300,
+                                  width: selected ? 2 : 1,
                                 ),
-                              ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Image.network(
+                                _thumbnailForVariant(key),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey.shade200,
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.broken_image),
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -357,41 +361,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _selectedVariantKey == null ? '' : _labelForVariant(_selectedVariantKey!),
-                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
 
-                  // ✅ size: có thì hiện, không có thì ẩn
+                  // ✅ Size: Ô BỰ + TỰ GIÃN THEO NỘI DUNG (vừa size 27, 27.5, EU 42...)
                   if (hasSizes) ...[
                     const SizedBox(height: 18),
-                    const Text('Chọn size', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text(
+                      'Chọn size',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: List.generate(widget.sizes.length, (index) {
-                        final s = widget.sizes[index];
-                        return GestureDetector(
-                          onTap: () => setState(() => selectedSizeIndex = index),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 15),
-                            width: 45,
-                            height: 45,
-                            decoration: BoxDecoration(
-                              color: selectedSizeIndex == index ? Colors.black : Colors.white,
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: List.generate(widget.sizes.length, (index) {
+                          final s = widget.sizes[index];
+                          final selected = selectedSizeIndex == index;
+
+                          return GestureDetector(
+                            onTap: () => setState(() => selectedSizeIndex = index),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              constraints: const BoxConstraints(
+                                minWidth: 60,  // ⬅️ tối thiểu bự hơn
+                                minHeight: 48, // ⬅️ cao hơn để nhìn đã
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18, // ⬅️ giúp size dài vẫn vừa
+                                vertical: 12,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: selected ? Colors.black : Colors.white,
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                               child: Text(
                                 s,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: selectedSizeIndex == index ? Colors.white : Colors.black,
+                                  fontSize: 15,
+                                  color: selected ? Colors.white : Colors.black,
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
+                          );
+                        }),
+                      ),
                     ),
                   ],
 
@@ -403,18 +424,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onPressed: _addToCart,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
                       ),
                       child: const Text(
                         'Thêm vào giỏ hàng',
-                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
