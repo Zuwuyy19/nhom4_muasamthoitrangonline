@@ -32,7 +32,6 @@ class AuthService {
     required String phone,
     required String address,
   }) async {
-    // 1) Tạo user trong FirebaseAuth
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,

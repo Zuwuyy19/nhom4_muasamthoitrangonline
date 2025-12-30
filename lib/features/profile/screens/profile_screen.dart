@@ -95,7 +95,7 @@ Future<void> _handleSignOut() async {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
+shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
@@ -187,7 +187,7 @@ Future<void> _handleSignOut() async {
   String _formatCreatedAt(Map<String, dynamic> data) {
     final raw = data['createdAt'];
     final millis = int.tryParse(raw?.toString() ?? '');
-    if (millis == null) return '---';
+if (millis == null) return '---';
     final dt = DateTime.fromMillisecondsSinceEpoch(millis);
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
@@ -269,7 +269,7 @@ Future<void> _handleSignOut() async {
               _ProfileTile(
                 title: 'Chỉnh sửa thông tin cá nhân',
                 subtitle: 'Cập nhật tên, email, số điện thoại',
-                icon: Icons.person_outline,
+icon: Icons.person_outline,
                 onTap: () => _requireLogin('chỉnh sửa thông tin'),
               ),
               _ProfileTile(
@@ -347,7 +347,7 @@ Future<void> _handleSignOut() async {
         final createdAt = _formatCreatedAt(data);
 
         return Scaffold(
-          appBar: AppBar(
+appBar: AppBar(
             title: const Text('Hồ sơ'),
             actions: [
               IconButton(
@@ -416,7 +416,7 @@ Future<void> _handleSignOut() async {
                           ),
                           onShipping: () => Navigator.push(
                             context,
-                            MaterialPageRoute(
+MaterialPageRoute(
                               builder: (_) => const ProcessingOrdersScreen(),
                             ),
                           ),
@@ -488,7 +488,7 @@ Future<void> _handleSignOut() async {
                   onTap: () => _showMessage(context, 'Mở trung tâm trợ giúp'),
                 ),
                 _ProfileTile(
-                  title: 'Cài đặt',
+title: 'Cài đặt',
                   subtitle: 'Thông báo, bảo mật, ngôn ngữ',
                   icon: Icons.settings_outlined,
                   onTap: () => _showMessage(context, 'Mở cài đặt'),
@@ -580,7 +580,7 @@ class _ProfileHeader extends StatelessWidget {
                           onPressed: onRegister,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
+side: const BorderSide(color: Colors.white54),
                           ),
                           child: const Text('Đăng ký'),
                         ),
@@ -692,7 +692,7 @@ class _ActionCard extends StatelessWidget {
         child: Column(
           children: [
             Icon(icon, color: Colors.black87),
-            const SizedBox(height: 8),
+const SizedBox(height: 8),
             Text(
               value,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
