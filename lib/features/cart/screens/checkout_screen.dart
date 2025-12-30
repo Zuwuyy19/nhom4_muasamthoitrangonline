@@ -1,20 +1,21 @@
-// lib/screens/checkout/checkout_screen.dart
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
-import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/cart_models.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
+
 import '../../home/screens/home_screen.dart';
 import 'momo_payment_screen.dart';
 import 'vnpay_payment_screen.dart';
+
+// ✅ Map picker cùng folder
+import 'map_picker_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final int totalAmount;
@@ -42,22 +43,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // Tọa độ mặc định (Ví dụ: HUTECH - TPHCM)
   LatLng _selectedLocation = const LatLng(10.801657, 106.714247);
   String _addressName = "Chưa chọn vị trí";
-  bool _isLoadingAddress = false;
 
   // Controllers
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _mapSearchController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _prefillFromProfile(); // ✅ tự đổ dữ liệu khi vào màn thanh toán
+    _prefillFromProfile();
   }
 
   /// ✅ Prefill họ tên / sdt / địa chỉ từ RTDB: users/{uid}
-  /// - chỉ set vào controller nếu user chưa nhập gì (tránh overwrite)
   Future<void> _prefillFromProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -87,24 +85,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _addressController.text = address.trim();
       }
 
-      // Nếu muốn phần “Vị trí trên bản đồ” cũng hiển thị địa chỉ đã lưu:
       if (!_didPrefill && address.trim().isNotEmpty) {
         setState(() => _addressName = address.trim());
       }
 
       _didPrefill = true;
-    } catch (_) {
-      // optional: bạn có thể show snackbar nếu muốn
-    }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _addressController.dispose();
-    _mapSearchController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  // ✅ mở màn map picker (tách file riêng)
+  Future<void> _showMapPicker() async {
+    final result = await Navigator.push<MapPickerResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerScreen(
+          initialLocation: _selectedLocation,
+          initialAddressName: _addressName,
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      _selectedLocation = result.location;
+      _addressName = result.addressName;
+    });
+
+    // ✅ đổ luôn vào ô địa chỉ chi tiết
+    _addressController.text = result.addressName;
   }
 
   @override
@@ -112,10 +129,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          "Thanh toán",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Thanh toán", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -163,8 +177,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 onTap: _showMapPicker,
                 child: Container(
                   width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -193,29 +206,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _isLoadingAddress
-                          ? const Padding(
-                              padding: EdgeInsets.only(left: 32.0),
-                              child: Text(
-                                "Đang lấy tên địa điểm...",
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.only(left: 32.0),
-                              child: Text(
-                                _addressName,
-                                style: const TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32.0),
+                        child: Text(
+                          _addressName,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -300,329 +302,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             onPressed: _handleOrder,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
             child: const Text(
               "XÁC NHẬN ĐẶT HÀNG",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  // =========================
-  // MAP + GEO
-  // =========================
-
-  Future<LatLng?> _searchPlace(String query) async {
-    if (query.trim().isEmpty) return null;
-    try {
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1',
-      );
-      final response = await http.get(url, headers: {
-        'User-Agent': 'com.nhom4.muasamthoitrang',
-      });
-
-      if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
-        if (data.isNotEmpty) {
-          final item = data[0];
-          final lat = double.tryParse(item['lat'].toString());
-          final lon = double.tryParse(item['lon'].toString());
-          if (lat != null && lon != null) {
-            return LatLng(lat, lon);
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  Future<void> _getAddressFromLatLng(LatLng point) async {
-    setState(() {
-      _isLoadingAddress = true;
-      _addressName = "Đang tìm vị trí...";
-    });
-
-    try {
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1',
-      );
-
-      final response = await http.get(url, headers: {
-        'User-Agent': 'com.nhom4.muasamthoitrang',
-      });
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final display = (data['display_name'] ?? "Không tìm thấy tên đường").toString();
-
-        setState(() {
-          _addressName = display;
-          _isLoadingAddress = false;
-          // ✅ tự điền vào ô địa chỉ chi tiết (nếu bạn muốn)
-          _addressController.text = display;
-        });
-      } else {
-        setState(() {
-          _addressName = "Lỗi kết nối máy chủ bản đồ";
-          _isLoadingAddress = false;
-          _addressController.text = _addressName;
-        });
-      }
-    } catch (_) {
-      setState(() {
-        _addressName =
-            "Vị trí: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
-        _isLoadingAddress = false;
-        _addressController.text = _addressName;
-      });
-    }
-  }
-
-  Future<Position?> _determinePosition(BuildContext context) async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng bật GPS trên điện thoại')),
-      );
-      return null;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bạn đã từ chối quyền vị trí')),
-        );
-        return null;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Quyền vị trí bị chặn vĩnh viễn, hãy mở cài đặt để cấp quyền',
-          ),
-        ),
-      );
-      return null;
-    }
-
-    return await Geolocator.getCurrentPosition();
-  }
-
-  void _showMapPicker() {
-    LatLng tempLocation = _selectedLocation;
-    final MapController mapController = MapController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        final size = MediaQuery.of(context).size;
-
-        return StatefulBuilder(
-          builder: (context, setStateMap) {
-            return AlertDialog(
-              contentPadding: EdgeInsets.zero,
-              insetPadding: const EdgeInsets.all(10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              content: SizedBox(
-                width: size.width,
-                height: size.height * 0.8,
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      color: Colors.black,
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                "Chọn vị trí giao hàng",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                onPressed: () => Navigator.pop(context),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _mapSearchController,
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (value) async {
-                              FocusScope.of(context).unfocus();
-                              final result = await _searchPlace(value);
-                              if (result != null) {
-                                setStateMap(() {
-                                  tempLocation = result;
-                                });
-                                mapController.move(result, 17.0);
-                                _getAddressFromLatLng(result);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Không tìm thấy địa điểm')),
-                                );
-                              }
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Tìm kiếm địa điểm, ví dụ: 123 Đường A',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.arrow_circle_right_outlined),
-                                onPressed: () async {
-                                  FocusScope.of(context).unfocus();
-                                  final value = _mapSearchController.text;
-                                  final result = await _searchPlace(value);
-                                  if (result != null) {
-                                    setStateMap(() {
-                                      tempLocation = result;
-                                    });
-                                    mapController.move(result, 17.0);
-                                    _getAddressFromLatLng(result);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Không tìm thấy địa điểm')),
-                                    );
-                                  }
-                                },
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 0,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          FlutterMap(
-                            mapController: mapController,
-                            options: MapOptions(
-                              initialCenter: tempLocation,
-                              initialZoom: 16.0,
-                              onTap: (tapPosition, point) {
-                                setStateMap(() {
-                                  tempLocation = point;
-                                });
-                              },
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate:
-                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                                subdomains: const ['a', 'b', 'c', 'd'],
-                                userAgentPackageName: 'com.nhom4.muasamthoitrang',
-                              ),
-                              MarkerLayer(
-                                markers: [
-                                  Marker(
-                                    width: 50.0,
-                                    height: 50.0,
-                                    point: tempLocation,
-                                    child: const Icon(
-                                      Icons.location_on,
-                                      color: Colors.red,
-                                      size: 50,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Positioned(
-                            bottom: 20,
-                            right: 20,
-                            child: FloatingActionButton(
-                              backgroundColor: Colors.white,
-                              onPressed: () async {
-                                Position? position =
-                                    await _determinePosition(context);
-                                if (position != null) {
-                                  LatLng newPos = LatLng(
-                                    position.latitude,
-                                    position.longitude,
-                                  );
-                                  setStateMap(() {
-                                    tempLocation = newPos;
-                                  });
-                                  mapController.move(newPos, 17.0);
-                                }
-                              },
-                              child:
-                                  const Icon(Icons.my_location, color: Colors.blue),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(15),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedLocation = tempLocation;
-                          });
-                          Navigator.pop(context);
-                          _getAddressFromLatLng(tempLocation);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
-                        child: const Text(
-                          "XÁC NHẬN VỊ TRÍ NÀY",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -680,13 +368,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Icon(icon, color: color),
             const SizedBox(width: 15),
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
+              child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
             ),
-            if (_paymentMethod == value)
-              const Icon(Icons.check_circle, color: Colors.black),
+            if (_paymentMethod == value) const Icon(Icons.check_circle, color: Colors.black),
           ],
         ),
       ),
@@ -698,9 +382,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     int amount, {
     bool isTotal = false,
   }) {
-    String money = amount
-        .toString()
-        .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+    String money = amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -767,6 +452,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             price: item.price,
             quantity: item.quantity,
             thumbnail: item.thumbnail,
+            // ✅ nếu OrderItem model bạn có size/color thì mở ra:
+            // size: item.size,
+            // color: item.color,
           ),
         )
         .toList();
@@ -780,8 +468,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
 
-      // ✅ Nếu OrderService của bạn có fields này thì mở ra dùng,
-      // còn nếu chưa có thì bạn bỏ comment hoặc tự bổ sung model.
+      // ✅ nếu OrderService bạn có support thì mở ra dùng:
       // phone: _phoneController.text.trim(),
       // address: _addressController.text.trim(),
       // mapAddressName: _addressName,
@@ -793,6 +480,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // COD
     if (_paymentMethod == 1) {
+      if (!mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -827,10 +515,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       (route) => false,
                     );
                   },
-                  child: const Text(
-                    'Tiếp tục mua sắm',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: const Text('Tiếp tục mua sắm', style: TextStyle(color: Colors.white)),
                 ),
               )
             ],
@@ -842,6 +527,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // MoMo
     if (_paymentMethod == 2) {
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -885,13 +571,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }),
       );
 
-      if (mounted) Navigator.pop(context); // đóng loading
+      if (mounted) Navigator.pop(context);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['code'] == '00' && data['data'] != null) {
           final String vnpayUrl = data['data'];
 
+          if (!mounted) return;
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -902,11 +589,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi Server Backend: ${response.statusCode}')),
       );
-    } catch (e) {
-      if (mounted) Navigator.pop(context); // đóng loading
+    } catch (_) {
+      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
