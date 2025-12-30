@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {
-// Một số lỗi FirebaseAuth có thể xuất hiện khi signInWithCredential
+      // Một số lỗi FirebaseAuth có thể xuất hiện khi signInWithCredential
       final msg = "Đăng nhập Google thất bại: ${e.message ?? e.code}";
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -178,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _loading ? null : _handleGoogleLogin,
                     icon: const Icon(Icons.g_mobiledata),
-label: const Text("Đăng nhập với Google"),
+                    label: const Text("Đăng nhập với Google"),
                   ),
                 ),
 
