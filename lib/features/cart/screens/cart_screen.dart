@@ -5,7 +5,6 @@ import '../../auth/screens/login_screen.dart';
 import '../models/cart_models.dart';
 import '../services/cart_service.dart';
 import 'checkout_screen.dart';
-import '../../product/screens/product_list_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key, this.onGoShopping});
@@ -77,9 +76,7 @@ class _CartScreenState extends State<CartScreen> {
         stream: _cartService.watchCart(user.uid),
         builder: (context, snapshot) {
           final items = snapshot.data ?? [];
-          if (items.isEmpty) {
-            return _buildEmptyCart();
-          }
+          if (items.isEmpty) return _buildEmptyCart();
 
           final total = items.fold<int>(0, (sum, item) => sum + item.price * item.quantity);
 
@@ -91,12 +88,14 @@ class _CartScreenState extends State<CartScreen> {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
+
                     return Dismissible(
-                      key: Key(item.productId),
+                      // ✅ Dùng cartKey (vì cartKey mới là key trong DB)
+                      key: Key(item.cartKey),
                       direction: DismissDirection.endToStart,
                       onDismissed: (_) => _cartService.removeItem(
                         uid: user.uid,
-                        productId: item.productId,
+                        cartKey: item.cartKey,
                       ),
                       background: Container(
                         alignment: Alignment.centerRight,
@@ -212,12 +211,20 @@ class _CartScreenState extends State<CartScreen> {
                     GestureDetector(
                       onTap: () => _cartService.removeItem(
                         uid: uid,
-                        productId: item.productId,
+                        cartKey: item.cartKey,
                       ),
                       child: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                     ),
                   ],
                 ),
+
+                // ✅ Hiển thị màu/size (nếu có)
+                const SizedBox(height: 6),
+                Text(
+                  '${item.color ?? '---'}${item.size != null ? " / ${item.size}" : ""}',
+                  style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                ),
+
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -238,7 +245,7 @@ class _CartScreenState extends State<CartScreen> {
                             icon: const Icon(Icons.remove, size: 14),
                             onPressed: () => _cartService.updateQuantity(
                               uid: uid,
-                              productId: item.productId,
+                              cartKey: item.cartKey,
                               quantity: item.quantity - 1,
                             ),
                           ),
@@ -250,7 +257,7 @@ class _CartScreenState extends State<CartScreen> {
                             icon: const Icon(Icons.add, size: 14),
                             onPressed: () => _cartService.updateQuantity(
                               uid: uid,
-                              productId: item.productId,
+                              cartKey: item.cartKey,
                               quantity: item.quantity + 1,
                             ),
                           ),

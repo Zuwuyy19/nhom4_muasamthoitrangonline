@@ -1,5 +1,4 @@
 import 'package:firebase_database/firebase_database.dart';
-
 import '../models/cart_models.dart';
 
 class OrderService {
@@ -8,7 +7,11 @@ class OrderService {
   DatabaseReference _ordersRef() => _db.child('orders');
 
   Stream<List<OrderModel>> watchOrdersByUser(String uid) {
-    return _ordersRef().orderByChild('userId').equalTo(uid).onValue.map((event) {
+    return _ordersRef()
+        .orderByChild('userId')
+        .equalTo(uid)
+        .onValue
+        .map((event) {
       final data = event.snapshot.value;
       if (data is Map) {
         final orders = data.entries
@@ -33,6 +36,7 @@ class OrderService {
   }) async {
     final ref = _ordersRef().push();
     final paidAt = paymentStatus == 'success' ? ServerValue.timestamp : null;
+
     await ref.set({
       'userId': userId,
       'userName': userName,
@@ -46,6 +50,7 @@ class OrderService {
         if (paidAt != null) 'paidAt': paidAt,
       },
     });
+
     return ref.key ?? '';
   }
 }

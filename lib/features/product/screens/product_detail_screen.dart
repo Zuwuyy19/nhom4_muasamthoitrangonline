@@ -11,7 +11,6 @@ class ProductDetailScreen extends StatefulWidget {
   final String thumbnail;
   final String categoryId;
 
-  // variants + sizes
   final Map<String, dynamic> variants; // { "white": {label, thumbnail, images: []}, ... }
   final List<String> sizes; // ["S","M"...] hoặc ["27","27.5","EU 42"]...
 
@@ -32,7 +31,6 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int selectedSizeIndex = 0;
-
   String? _selectedVariantKey;
 
   final CartService _cartService = CartService();
@@ -76,7 +74,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         }
       }
     }
-
     final fb = widget.thumbnail.trim();
     return fb.isNotEmpty ? [fb] : [];
   }
@@ -105,14 +102,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return key;
   }
 
+  // ✅ FIX: addToCart có size + color(label) + thumbnail theo variant
   Future<void> _addToCart() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
       );
       return;
     }
+
+    // size
+    String? selectedSize;
+    if (widget.sizes.isNotEmpty) {
+      if (selectedSizeIndex < 0 || selectedSizeIndex >= widget.sizes.length) {
+        selectedSizeIndex = 0;
+      }
+      final s = widget.sizes[selectedSizeIndex].trim();
+      selectedSize = s.isEmpty ? null : s;
+    }
+
+    // color
+    final colorKey = _selectedVariantKey?.trim();
+    if (widget.variants.isNotEmpty && (colorKey == null || colorKey.isEmpty)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn màu trước khi thêm vào giỏ')),
+      );
+      return;
+    }
+
+    String? colorLabel;
+    String finalThumb = widget.thumbnail;
+
+    if (widget.variants.isNotEmpty && colorKey != null && widget.variants[colorKey] is Map) {
+      final v = Map<String, dynamic>.from(widget.variants[colorKey] as Map);
+
+      final label = (v['label'] ?? '').toString().trim();
+      if (label.isNotEmpty) colorLabel = label;
+
+      final thumb = (v['thumbnail'] ?? '').toString().trim();
+      if (thumb.isNotEmpty) finalThumb = thumb;
+    }
+
+    colorLabel ??= colorKey;
 
     await _cartService.addOrUpdateItem(
       uid: user.uid,
@@ -120,18 +154,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       productName: widget.name,
       price: widget.price,
       quantity: 1,
-      thumbnail: widget.thumbnail,
+      thumbnail: finalThumb,
+      size: selectedSize,
+      color: colorLabel,
     );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã thêm ${widget.name} vào giỏ hàng')),
+      SnackBar(
+        content: Text(
+          'Đã thêm: ${widget.name}'
+          '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
+          '${selectedSize != null ? " / $selectedSize" : ""}',
+        ),
+      ),
     );
   }
 
   Future<void> _addToWishlist() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng đăng nhập để thêm yêu thích')),
       );
@@ -166,7 +209,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Slider ảnh theo màu
           Positioned(
             top: 0,
             left: 0,
@@ -217,7 +259,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // Top buttons
           Positioned(
             top: 50,
             left: 20,
@@ -229,10 +270,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   onTap: () => Navigator.pop(context),
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: const Icon(Icons.arrow_back, color: Colors.black),
                   ),
                 ),
@@ -240,10 +278,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   onTap: _addToWishlist,
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: const Icon(Icons.favorite_border, color: Colors.black),
                   ),
                 ),
@@ -251,7 +286,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
 
-          // Bottom sheet
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -260,18 +294,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 20,
-                    offset: Offset(0, -5),
-                  )
-                ],
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -5))],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name + price
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,38 +309,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             Text(
                               widget.name,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 5),
-                            const Text(
-                              'Mô tả sản phẩm',
-                              style: TextStyle(color: Colors.grey),
-                            ),
+                            const Text('Mô tả sản phẩm', style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
                       Text(
                         '${_formatPrice(widget.price)}đ',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
 
-                  // Chọn màu bằng thumbnail
                   if (hasVariants) ...[
                     const SizedBox(height: 18),
-                    const Text(
-                      'Màu sắc',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
+                    const Text('Màu sắc', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 64,
@@ -331,7 +345,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 _selectedVariantKey = key;
                                 _activeImageIndex = 0;
                               });
-                              _pageCtrl.jumpToPage(0);
+                              if (_pageCtrl.hasClients) _pageCtrl.jumpToPage(0);
                             },
                             child: Container(
                               width: 64,
@@ -361,20 +375,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _selectedVariantKey == null ? '' : _labelForVariant(_selectedVariantKey!),
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
                     ),
                   ],
 
-                  // ✅ Size: Ô BỰ + TỰ GIÃN THEO NỘI DUNG (vừa size 27, 27.5, EU 42...)
                   if (hasSizes) ...[
                     const SizedBox(height: 18),
-                    const Text(
-                      'Chọn size',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
+                    const Text('Chọn size', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -387,14 +394,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             onTap: () => setState(() => selectedSizeIndex = index),
                             child: Container(
                               margin: const EdgeInsets.only(right: 12),
-                              constraints: const BoxConstraints(
-                                minWidth: 60,  // ⬅️ tối thiểu bự hơn
-                                minHeight: 48, // ⬅️ cao hơn để nhìn đã
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18, // ⬅️ giúp size dài vẫn vừa
-                                vertical: 12,
-                              ),
+                              constraints: const BoxConstraints(minWidth: 60, minHeight: 48),
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: selected ? Colors.black : Colors.white,
@@ -424,17 +425,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onPressed: _addToCart,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       child: const Text(
                         'Thêm vào giỏ hàng',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),

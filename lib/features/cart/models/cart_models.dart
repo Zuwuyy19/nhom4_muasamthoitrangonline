@@ -1,4 +1,7 @@
+// ========================= cart_models.dart =========================
+
 class CartItem {
+  final String cartKey; // ✅ key trong DB: productId__size__color
   final String productId;
   final String productName;
   final int price;
@@ -6,23 +9,33 @@ class CartItem {
   final String thumbnail;
   final int createdAt;
 
+  // ✅ size/màu (màu = LABEL hiển thị, vd "Black Pink")
+  final String? size;
+  final String? color;
+
   CartItem({
+    required this.cartKey,
     required this.productId,
     required this.productName,
     required this.price,
     required this.quantity,
     required this.thumbnail,
     required this.createdAt,
+    this.size,
+    this.color,
   });
 
-  factory CartItem.fromMap(String productId, Map<dynamic, dynamic> map) {
+  factory CartItem.fromMap(String cartKey, Map<dynamic, dynamic> map) {
     return CartItem(
-      productId: productId,
+      cartKey: cartKey,
+      productId: (map['productId'] ?? '').toString(),
       productName: (map['productName'] ?? '').toString(),
       price: int.tryParse((map['price'] ?? 0).toString()) ?? 0,
       quantity: int.tryParse((map['quantity'] ?? 0).toString()) ?? 0,
       thumbnail: (map['thumbnail'] ?? '').toString(),
       createdAt: int.tryParse((map['createdAt'] ?? 0).toString()) ?? 0,
+      size: map['size']?.toString(),
+      color: map['color']?.toString(),
     );
   }
 
@@ -34,6 +47,8 @@ class CartItem {
       'quantity': quantity,
       'thumbnail': thumbnail,
       'createdAt': createdAt,
+      if (size != null && size!.trim().isNotEmpty) 'size': size,
+      if (color != null && color!.trim().isNotEmpty) 'color': color,
     };
   }
 }
@@ -74,12 +89,18 @@ class OrderItem {
   final int quantity;
   final String thumbnail;
 
+  // ✅ lưu size/màu (label)
+  final String? size;
+  final String? color;
+
   OrderItem({
     required this.productId,
     required this.productName,
     required this.price,
     required this.quantity,
     required this.thumbnail,
+    this.size,
+    this.color,
   });
 
   factory OrderItem.fromMap(Map<dynamic, dynamic> map) {
@@ -89,6 +110,8 @@ class OrderItem {
       price: int.tryParse((map['price'] ?? 0).toString()) ?? 0,
       quantity: int.tryParse((map['quantity'] ?? 0).toString()) ?? 0,
       thumbnail: (map['thumbnail'] ?? '').toString(),
+      size: map['size']?.toString(),
+      color: map['color']?.toString(),
     );
   }
 
@@ -99,6 +122,8 @@ class OrderItem {
       'price': price,
       'quantity': quantity,
       'thumbnail': thumbnail,
+      if (size != null && size!.trim().isNotEmpty) 'size': size,
+      if (color != null && color!.trim().isNotEmpty) 'color': color,
     };
   }
 }
@@ -158,11 +183,10 @@ class OrderModel {
     final items = <OrderItem>[];
     if (itemsRaw is List) {
       for (final item in itemsRaw) {
-        if (item is Map) {
-          items.add(OrderItem.fromMap(item));
-        }
+        if (item is Map) items.add(OrderItem.fromMap(item));
       }
     }
+
     return OrderModel(
       id: id,
       userId: (map['userId'] ?? '').toString(),

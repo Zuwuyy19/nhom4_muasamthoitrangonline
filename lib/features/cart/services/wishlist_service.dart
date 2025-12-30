@@ -1,11 +1,11 @@
 import 'package:firebase_database/firebase_database.dart';
-
 import '../models/cart_models.dart';
 
 class WishlistService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
 
-  DatabaseReference _wishlistRef(String uid) => _db.child('users').child(uid).child('wishlist');
+  DatabaseReference _wishlistRef(String uid) =>
+      _db.child('users').child(uid).child('wishlist');
 
   Stream<List<WishlistItem>> watchWishlist(String uid) {
     return _wishlistRef(uid).onValue.map((event) {
@@ -39,7 +39,10 @@ class WishlistService {
     });
   }
 
-  Future<void> removeItem({required String uid, required String productId}) async {
+  Future<void> removeItem({
+    required String uid,
+    required String productId,
+  }) async {
     await _wishlistRef(uid).child(productId).remove();
   }
 }
