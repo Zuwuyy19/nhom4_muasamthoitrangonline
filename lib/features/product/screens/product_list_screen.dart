@@ -1,5 +1,3 @@
-// lib/product/screens/product_list_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -7,7 +5,8 @@ import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
 
 final DatabaseReference _productsRef = FirebaseDatabase.instance.ref('products');
-final DatabaseReference _categoriesRef = FirebaseDatabase.instance.ref('categories');
+final DatabaseReference _categoriesRef =
+    FirebaseDatabase.instance.ref('categories');
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -30,6 +29,38 @@ class _ProductListScreenState extends State<ProductListScreen> {
     return result;
   }
 
+  // fallback cũ: products/images là List
+  List<String> _parseImages(dynamic imagesRaw, String fallback) {
+    final List<String> imgs = [];
+    if (imagesRaw is List) {
+      for (final x in imagesRaw) {
+        final s = (x ?? '').toString().trim();
+        if (s.isNotEmpty) imgs.add(s);
+      }
+    }
+    final fb = fallback.trim();
+    if (imgs.isEmpty && fb.isNotEmpty) imgs.add(fb);
+    return imgs;
+  }
+
+  // sizes: ["S","M"...]
+  List<String> _parseSizes(dynamic sizesRaw) {
+    final List<String> out = [];
+    if (sizesRaw is List) {
+      for (final x in sizesRaw) {
+        final s = (x ?? '').toString().trim();
+        if (s.isNotEmpty) out.add(s);
+      }
+    }
+    return out;
+  }
+
+  // variants: Map<String,dynamic>
+  Map<String, dynamic> _parseVariants(dynamic raw) {
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return {};
+  }
+
   List<Map<String, dynamic>> _parseProducts(dynamic data) {
     final List<Map<String, dynamic>> loaded = [];
     if (data is Map) {
@@ -38,11 +69,37 @@ class _ProductListScreenState extends State<ProductListScreen> {
           final productData = Map<String, dynamic>.from(value);
 
           final name = (productData["name"] ?? "Sản phẩm").toString();
-          final thumbnail = (productData["thumbnail"] ?? productData["image"] ?? "").toString();
-          final categoryId = (productData["categoryId"] ?? productData["category"] ?? "all").toString();
+          final baseThumb =
+              (productData["thumbnail"] ?? productData["image"] ?? "").toString();
+
+          final categoryId =
+              (productData["categoryId"] ?? productData["category"] ?? "all")
+                  .toString();
+
+          final variants = _parseVariants(productData["variants"]);
+          final sizes = _parseSizes(productData["sizes"]);
+
+          // thumbnail hiển thị card:
+          // - nếu có variants, lấy thumbnail của variant đầu tiên (nếu có)
+          String cardThumb = baseThumb;
+          if (variants.isNotEmpty) {
+            final firstKey = variants.keys.first;
+            final v = variants[firstKey];
+            if (v is Map) {
+              final t = (v["thumbnail"] ?? "").toString().trim();
+              if (t.isNotEmpty) cardThumb = t;
+              // nếu không có thumbnail thì lấy ảnh đầu trong images
+              final rawImgs = v["images"];
+              if (t.isEmpty && rawImgs is List && rawImgs.isNotEmpty) {
+                final firstImg = (rawImgs.first ?? "").toString().trim();
+                if (firstImg.isNotEmpty) cardThumb = firstImg;
+              }
+            }
+          }
 
           final priceRaw = productData["price"] ?? 0;
           final int priceInt = int.tryParse(priceRaw.toString()) ?? 0;
+
           final String formattedPrice = priceInt.toString().replaceAllMapped(
             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
             (Match m) => '${m[1]}.',
@@ -51,10 +108,17 @@ class _ProductListScreenState extends State<ProductListScreen> {
           loaded.add({
             "id": id,
             "name": name,
-            "thumbnail": thumbnail,
+            "thumbnail": cardThumb, // dùng cho card
+            "baseThumb": baseThumb, // thumb gốc
             "price": priceInt,
             "priceText": "${formattedPrice}đ",
             "categoryId": categoryId,
+
+            "variants": variants, // ✅ NEW
+            "sizes": sizes, // ✅ NEW
+
+            // fallback cũ nếu chưa có variants
+            "images": _parseImages(productData["images"], baseThumb),
           });
         }
       });
@@ -64,19 +128,46 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   List<Map<String, dynamic>> _filterByCategory(List<Map<String, dynamic>> products) {
     if (_selectedCategoryKey == 'all') return products;
-    return products.where((p) => (p["categoryId"] ?? "").toString() == _selectedCategoryKey).toList();
+    return products
+        .where((p) => (p["categoryId"] ?? "").toString() == _selectedCategoryKey)
+        .toList();
   }
 
   void _openDetail(Map<String, dynamic> product) {
+    final variants = (product["variants"] is Map)
+        ? Map<String, dynamic>.from(product["variants"])
+        : <String, dynamic>{};
+
+    final sizes = (product["sizes"] is List)
+        ? List<String>.from(product["sizes"])
+        : <String>[];
+
+    final baseThumb = (product["baseThumb"] ?? product["thumbnail"] ?? "").toString();
+
+    // ✅ Nếu DB chưa có variants, tạo variant giả từ images cũ để vẫn chạy
+    Map<String, dynamic> safeVariants = variants;
+    if (safeVariants.isEmpty) {
+      final imgs = (product["images"] is List) ? List<String>.from(product["images"]) : <String>[];
+      safeVariants = {
+        "default": {
+          "label": "Default",
+          "thumbnail": baseThumb,
+          "images": imgs.isNotEmpty ? imgs : [baseThumb],
+        }
+      };
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
           productId: (product["id"] ?? "").toString(),
-          name: product["name"] ?? "Sản phẩm",
+          name: (product["name"] ?? "Sản phẩm").toString(),
           price: product["price"] is int ? product["price"] as int : 0,
-          thumbnail: (product["thumbnail"] ?? "").toString(),
+          thumbnail: baseThumb,
           categoryId: (product["categoryId"] ?? "all").toString(),
+          variants: safeVariants,
+          sizes: sizes,
         ),
       ),
     );
