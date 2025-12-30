@@ -25,6 +25,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final CartService _cartService = CartService();
 
   String _selectedCategoryKey = 'all';
+  
+  // Biến phục vụ chức năng tìm kiếm
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Map<String, String> _parseCategories(dynamic data) {
     final Map<String, String> result = {};
@@ -37,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return result;
   }
 
-  // fallback images (cũ): products/images là List
+  // fallback images
   List<String> _parseImages(dynamic imagesRaw, String fallback) {
     final List<String> imgs = [];
     if (imagesRaw is List) {
@@ -51,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return imgs;
   }
 
-  // parse sizes: ["S","M"...]
+  // parse sizes
   List<String> _parseSizes(dynamic sizesRaw) {
     final List<String> out = [];
     if (sizesRaw is List) {
@@ -63,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return out;
   }
 
-  // parse variants: Map<String, dynamic>
+  // parse variants
   Map<String, dynamic> _parseVariants(dynamic raw) {
     if (raw is Map) {
       return Map<String, dynamic>.from(raw);
@@ -86,8 +96,6 @@ class _HomeScreenState extends State<HomeScreen> {
           final variants = _parseVariants(productData["variants"]);
           final sizes = _parseSizes(productData["sizes"]);
 
-          // thumbnail hiển thị card:
-          // - nếu có variants, lấy thumbnail của variant đầu tiên (nếu có)
           String cardThumb = thumbnail;
           if (variants.isNotEmpty) {
             final firstKey = variants.keys.first;
@@ -108,14 +116,14 @@ class _HomeScreenState extends State<HomeScreen> {
           loaded.add({
             "id": id,
             "name": name,
-            "thumbnail": cardThumb,     // dùng cho card
-            "baseThumb": thumbnail,     // thumb gốc
+            "thumbnail": cardThumb,
+            "baseThumb": thumbnail,
             "price": priceInt,
             "priceText": "${formattedPrice}đ",
             "categoryId": categoryId,
-            "variants": variants,       // ✅ NEW
-            "sizes": sizes,             // ✅ NEW
-            "images": _parseImages(productData["images"], thumbnail), // fallback cũ
+            "variants": variants,
+            "sizes": sizes,
+            "images": _parseImages(productData["images"], thumbnail),
           });
         }
       });
@@ -123,9 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return loaded;
   }
 
-  List<Map<String, dynamic>> _filterByCategory(List<Map<String, dynamic>> products, String categoryKey) {
-    if (categoryKey == 'all') return products;
-    return products.where((p) => (p["categoryId"] ?? "").toString() == categoryKey).toList();
+  // Cập nhật logic lọc: Lọc theo cả danh mục và từ khóa tìm kiếm
+  List<Map<String, dynamic>> _filterProducts(List<Map<String, dynamic>> products, String categoryKey, String query) {
+    return products.where((p) {
+      final name = (p["name"] ?? "").toString().toLowerCase();
+      final matchesCategory = (categoryKey == 'all' || (p["categoryId"] ?? "").toString() == categoryKey);
+      final matchesSearch = name.contains(query.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).toList();
   }
 
   void _openDetail(Map<String, dynamic> product) {
@@ -137,10 +150,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ? List<String>.from(product["sizes"])
         : <String>[];
 
-    // thumbnail truyền vào detail: ưu tiên baseThumb (image cũ)
     final baseThumb = (product["baseThumb"] ?? product["thumbnail"] ?? "").toString();
 
-    // Nếu DB chưa có variants, vẫn cho chạy: tạo variant giả từ images cũ
     Map<String, dynamic> safeVariants = variants;
     if (safeVariants.isEmpty) {
       final imgs = (product["images"] is List) ? List<String>.from(product["images"]) : <String>[];
@@ -162,8 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
           price: product["price"] is int ? product["price"] as int : 0,
           thumbnail: baseThumb,
           categoryId: (product["categoryId"] ?? "all").toString(),
-          variants: safeVariants, // ✅ truyền variants
-          sizes: sizes,           // ✅ truyền sizes
+          variants: safeVariants,
+          sizes: sizes,
         ),
       ),
     );
@@ -359,6 +370,42 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          // --- PHẦN TÌM KIẾM MỚI ---
+          TextField(
+            controller: _searchController,
+            onChanged: (val) => setState(() => _searchQuery = val),
+            decoration: InputDecoration(
+              hintText: "Tìm kiếm sản phẩm...",
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty 
+                ? IconButton(
+                    icon: const Icon(Icons.clear), 
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    }
+                  ) 
+                : null,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.black, width: 1.5),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // --- HẾT PHẦN TÌM KIẾM ---
+
           StreamBuilder<DatabaseEvent>(
             stream: _categoriesRef.onValue,
             builder: (context, snap) {
@@ -415,8 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (snapshot.hasError) return _noData('Lỗi tải sản phẩm: ${snapshot.error}');
 
                 final allProducts = _parseProducts(snapshot.data?.snapshot.value);
-                final filtered = _filterByCategory(allProducts, _selectedCategoryKey);
-                if (filtered.isEmpty) return _noData('Không có sản phẩm trong danh mục này.');
+                
+                // Sử dụng hàm lọc mới cho cả Category và Search
+                final filtered = _filterProducts(allProducts, _selectedCategoryKey, _searchQuery);
+                
+                if (filtered.isEmpty) return _noData('Không tìm thấy sản phẩm nào.');
 
                 return GridView.builder(
                   itemCount: filtered.length,

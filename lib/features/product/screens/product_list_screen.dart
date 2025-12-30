@@ -17,6 +17,7 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   String _selectedCategoryKey = 'all';
+  String _searchText = '';
 
   Map<String, String> _parseCategories(dynamic data) {
     final Map<String, String> result = {};
@@ -70,7 +71,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
           final name = (productData["name"] ?? "Sản phẩm").toString();
           final baseThumb =
-              (productData["thumbnail"] ?? productData["image"] ?? "").toString();
+              (productData["thumbnail"] ?? productData["image"] ?? "")
+                  .toString();
 
           final categoryId =
               (productData["categoryId"] ?? productData["category"] ?? "all")
@@ -79,8 +81,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
           final variants = _parseVariants(productData["variants"]);
           final sizes = _parseSizes(productData["sizes"]);
 
-          // thumbnail hiển thị card:
-          // - nếu có variants, lấy thumbnail của variant đầu tiên (nếu có)
           String cardThumb = baseThumb;
           if (variants.isNotEmpty) {
             final firstKey = variants.keys.first;
@@ -88,19 +88,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
             if (v is Map) {
               final t = (v["thumbnail"] ?? "").toString().trim();
               if (t.isNotEmpty) cardThumb = t;
-              // nếu không có thumbnail thì lấy ảnh đầu trong images
               final rawImgs = v["images"];
               if (t.isEmpty && rawImgs is List && rawImgs.isNotEmpty) {
-                final firstImg = (rawImgs.first ?? "").toString().trim();
+                final firstImg =
+                    (rawImgs.first ?? "").toString().trim();
                 if (firstImg.isNotEmpty) cardThumb = firstImg;
               }
             }
           }
 
           final priceRaw = productData["price"] ?? 0;
-          final int priceInt = int.tryParse(priceRaw.toString()) ?? 0;
+          final int priceInt =
+              int.tryParse(priceRaw.toString()) ?? 0;
 
-          final String formattedPrice = priceInt.toString().replaceAllMapped(
+          final String formattedPrice =
+              priceInt.toString().replaceAllMapped(
             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
             (Match m) => '${m[1]}.',
           );
@@ -108,16 +110,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
           loaded.add({
             "id": id,
             "name": name,
-            "thumbnail": cardThumb, // dùng cho card
-            "baseThumb": baseThumb, // thumb gốc
+            "thumbnail": cardThumb,
+            "baseThumb": baseThumb,
             "price": priceInt,
             "priceText": "${formattedPrice}đ",
             "categoryId": categoryId,
-
-            "variants": variants, // ✅ NEW
-            "sizes": sizes, // ✅ NEW
-
-            // fallback cũ nếu chưa có variants
+            "variants": variants,
+            "sizes": sizes,
             "images": _parseImages(productData["images"], baseThumb),
           });
         }
@@ -126,11 +125,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
     return loaded;
   }
 
-  List<Map<String, dynamic>> _filterByCategory(List<Map<String, dynamic>> products) {
+  List<Map<String, dynamic>> _filterByCategory(
+      List<Map<String, dynamic>> products) {
     if (_selectedCategoryKey == 'all') return products;
     return products
-        .where((p) => (p["categoryId"] ?? "").toString() == _selectedCategoryKey)
+        .where((p) =>
+            (p["categoryId"] ?? "").toString() ==
+            _selectedCategoryKey)
         .toList();
+  }
+
+  // ✅ NEW: tìm kiếm theo tên sản phẩm
+  List<Map<String, dynamic>> _filterBySearch(
+      List<Map<String, dynamic>> products) {
+    if (_searchText.trim().isEmpty) return products;
+    final keyword = _searchText.toLowerCase();
+    return products.where((p) {
+      final name = (p["name"] ?? "").toString().toLowerCase();
+      return name.contains(keyword);
+    }).toList();
   }
 
   void _openDetail(Map<String, dynamic> product) {
@@ -142,12 +155,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
         ? List<String>.from(product["sizes"])
         : <String>[];
 
-    final baseThumb = (product["baseThumb"] ?? product["thumbnail"] ?? "").toString();
+    final baseThumb =
+        (product["baseThumb"] ?? product["thumbnail"] ?? "")
+            .toString();
 
-    // ✅ Nếu DB chưa có variants, tạo variant giả từ images cũ để vẫn chạy
     Map<String, dynamic> safeVariants = variants;
     if (safeVariants.isEmpty) {
-      final imgs = (product["images"] is List) ? List<String>.from(product["images"]) : <String>[];
+      final imgs = (product["images"] is List)
+          ? List<String>.from(product["images"])
+          : <String>[];
       safeVariants = {
         "default": {
           "label": "Default",
@@ -161,11 +177,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
-          productId: (product["id"] ?? "").toString(),
-          name: (product["name"] ?? "Sản phẩm").toString(),
-          price: product["price"] is int ? product["price"] as int : 0,
+          productId: product["id"].toString(),
+          name: product["name"].toString(),
+          price: product["price"] as int,
           thumbnail: baseThumb,
-          categoryId: (product["categoryId"] ?? "all").toString(),
+          categoryId: product["categoryId"].toString(),
           variants: safeVariants,
           sizes: sizes,
         ),
@@ -180,9 +196,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off, size: 50, color: Colors.grey),
+            const Icon(Icons.search_off,
+                size: 50, color: Colors.grey),
             const SizedBox(height: 10),
-            Text(msg, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(msg,
+                style: const TextStyle(
+                    fontSize: 16, color: Colors.grey)),
           ],
         ),
       ),
@@ -192,87 +211,122 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sản phẩm'),
-      ),
+      appBar: AppBar(title: const Text('Sản phẩm')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            /// Categories
             StreamBuilder<DatabaseEvent>(
               stream: _categoriesRef.onValue,
               builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+                if (snap.connectionState ==
+                    ConnectionState.waiting) {
                   return const SizedBox(
                     height: 44,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                        child: CircularProgressIndicator()),
                   );
                 }
-                if (snap.hasError) return _noData('Lỗi tải danh mục: ${snap.error}');
 
-                final categories = _parseCategories(snap.data?.snapshot.value);
+                final categories =
+                    _parseCategories(snap.data?.snapshot.value);
 
-                if (!categories.containsKey(_selectedCategoryKey)) {
+                if (!categories
+                    .containsKey(_selectedCategoryKey)) {
                   _selectedCategoryKey = 'all';
                 }
 
-                final keys = categories.keys.toList();
-                keys.sort((a, b) {
-                  if (a == 'all') return -1;
-                  if (b == 'all') return 1;
-                  return (categories[a] ?? '').compareTo(categories[b] ?? '');
-                });
+                final keys = categories.keys.toList()
+                  ..sort((a, b) {
+                    if (a == 'all') return -1;
+                    if (b == 'all') return 1;
+                    return (categories[a] ?? '')
+                        .compareTo(categories[b] ?? '');
+                  });
 
                 return SizedBox(
                   height: 42,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: keys.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: 10),
                     itemBuilder: (_, i) {
                       final key = keys[i];
-                      final name = categories[key] ?? key;
-                      final selected = key == _selectedCategoryKey;
+                      final selected =
+                          key == _selectedCategoryKey;
 
                       return ChoiceChip(
                         label: Text(
-                          name,
+                          categories[key] ?? key,
                           style: TextStyle(
-                            color: selected ? Colors.white : Colors.black,
+                            color: selected
+                                ? Colors.white
+                                : Colors.black,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         selected: selected,
                         selectedColor: Colors.black,
                         backgroundColor: Colors.white,
-                        onSelected: (_) => setState(() => _selectedCategoryKey = key),
-                        shape: StadiumBorder(
-                          side: BorderSide(color: Colors.grey.shade300),
-                        ),
+                        onSelected: (_) =>
+                            setState(() => _selectedCategoryKey = key),
                       );
                     },
                   ),
                 );
               },
             ),
-            const SizedBox(height: 14),
+
+            const SizedBox(height: 12),
+
+            /// Search
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Tìm kiếm ...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() => _searchText = value);
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            /// Products
             Expanded(
               child: StreamBuilder<DatabaseEvent>(
                 stream: _productsRef.onValue,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                        child: CircularProgressIndicator());
                   }
-                  if (snapshot.hasError) return _noData('Lỗi tải sản phẩm: ${snapshot.error}');
 
-                  final allProducts = _parseProducts(snapshot.data?.snapshot.value);
-                  final filtered = _filterByCategory(allProducts);
+                  final allProducts = _parseProducts(
+                      snapshot.data?.snapshot.value);
+                  final byCategory =
+                      _filterByCategory(allProducts);
+                  final filtered =
+                      _filterBySearch(byCategory);
 
-                  if (filtered.isEmpty) return _noData('Không có sản phẩm trong danh mục này.');
+                  if (filtered.isEmpty) {
+                    return _noData(
+                        'Không có sản phẩm phù hợp.');
+                  }
 
                   return GridView.builder(
                     itemCount: filtered.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
