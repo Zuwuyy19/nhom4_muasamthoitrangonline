@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../cart/services/cart_service.dart';
 import '../../cart/services/wishlist_service.dart';
@@ -172,7 +173,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _addToWishlist() async {
+  Future<void> _toggleWishlist() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
@@ -182,19 +183,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
-    await _wishlistService.addItem(
-      uid: user.uid,
-      productId: widget.productId,
-      productName: widget.name,
-      price: widget.price,
-      thumbnail: widget.thumbnail,
-      categoryId: widget.categoryId,
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
-    );
+    // Check directly from DB or just try to toggle based on current UI state?
+    // Robust way: fetch current state or assume UI is correct.
+    // Let's rely on the service actions.
+    // For simplicity, we will check existence inside the UI StreamBuilder,
+    // but here we just need to know if we should add or remove.
+    // We can query once to be sure.
+    
+    final dbRef = FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/${widget.productId}');
+    final snapshot = await dbRef.get();
+    
+    if (snapshot.exists) {
+        await _wishlistService.removeItem(uid: user.uid, productId: widget.productId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã xóa khỏi danh sách yêu thích')),
+        );
+    } else {
+        await _wishlistService.addItem(
+            uid: user.uid,
+            productId: widget.productId,
+            productName: widget.name,
+            price: widget.price,
+            thumbnail: widget.thumbnail,
+            categoryId: widget.categoryId,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
+        );
+    }
   }
 
   @override
@@ -206,6 +224,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final hasSizes = widget.sizes.isNotEmpty;
     final hasVariants = widget.variants.isNotEmpty;
+    
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       body: Stack(
@@ -282,13 +302,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: const Icon(Icons.arrow_back, color: Colors.black),
                   ),
                 ),
-                GestureDetector(
-                  onTap: _addToWishlist,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.favorite_border, color: Colors.black),
-                  ),
+                StreamBuilder(
+                  stream: user == null ? null : FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/${widget.productId}').onValue,
+                  builder: (context, snapshot) {
+                      final exists = snapshot.hasData && 
+                                     snapshot.data != null && 
+                                     (snapshot.data! as DatabaseEvent).snapshot.exists;
+                      
+                      return GestureDetector(
+                        onTap: _toggleWishlist,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: Icon(
+                            exists ? Icons.favorite : Icons.favorite_border,
+                            color: exists ? Colors.red : Colors.black,
+                          ),
+                        ),
+                      );
+                  },
                 ),
               ],
             ),

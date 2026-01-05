@@ -401,15 +401,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 12,
                   childAspectRatio: 0.7,
                 ),
-                itemBuilder: (_, i) {
-                  final p = displayList[i];
-                  return ProductCard(
-                    title: p["name"] ?? "Sản phẩm",
-                    price: p["priceText"] ?? "N/A",
-                    imageUrl: p["thumbnail"] ?? "",
-                    onTap: () => _openDetail(p),
-                  );
-                },
+                  itemBuilder: (_, i) {
+                    final p = displayList[i];
+                    return ProductCard(
+                      id: (p["id"] ?? "").toString(),
+                      title: p["name"] ?? "Sản phẩm",
+                      price: p["priceText"] ?? "N/A",
+                      priceInt: p["price"] is int ? p["price"] : 0,
+                      imageUrl: p["thumbnail"] ?? "",
+                      categoryId: (p["categoryId"] ?? "all").toString(),
+                      onTap: () => _openDetail(p),
+                    );
+                  },
               );
             },
           ),
@@ -532,9 +535,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemBuilder: (_, i) {
                     final p = filtered[i];
                     return ProductCard(
+                      id: (p["id"] ?? "").toString(),
                       title: p["name"] ?? "Sản phẩm",
                       price: p["priceText"] ?? "N/A",
+                      priceInt: p["price"] is int ? p["price"] : 0,
                       imageUrl: p["thumbnail"] ?? "",
+                      categoryId: (p["categoryId"] ?? "all").toString(),
                       onTap: () => _openDetail(p),
                     );
                   },
