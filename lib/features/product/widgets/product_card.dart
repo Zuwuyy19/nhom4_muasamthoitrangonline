@@ -5,92 +5,110 @@ class ProductCard extends StatelessWidget {
   final String price;
   final String imageUrl;
   final VoidCallback onTap;
+  final VoidCallback? onAddToCart;
+  final VoidCallback? onAddToWishlist;
 
-  // SỬA LỖI 2: Dùng super.key cho ngắn gọn, chuẩn Flutter mới
   const ProductCard({
-    super.key, 
+    super.key,
     required this.title,
     required this.price,
     required this.imageUrl,
     required this.onTap,
+    this.onAddToCart,
+    this.onAddToWishlist,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              // SỬA LỖI 1: Thay withOpacity(0.1) bằng withValues(alpha: 0.1)
-              color: Colors.grey.withValues(alpha: 0.1),
-              spreadRadius: 1,
-              blurRadius: 5,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(15),
+      elevation: 2,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(15),
+        onTap: onTap, // mở chi tiết
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Ảnh + nút wishlist
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                  image: DecorationImage(
-                    image: NetworkImage(imageUrl),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: const Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.favorite_border, size: 16, color: Colors.grey),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                    child: Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.image_not_supported),
+                      ),
                     ),
                   ),
-                ),
+                  // ❤️ Tim wishlist — tách riêng vùng chạm
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      child: InkResponse(
+                        onTap: onAddToWishlist,
+                        radius: 20,
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.favorite_border,
+                            size: 18,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            // Tên + giá + nút giỏ hàng
             Padding(
-              padding: const EdgeInsets.all(10.0),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  const SizedBox(height: 4),
-                  const Text("Brand Name", style: TextStyle(color: Colors.grey, fontSize: 10)),
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         price,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                        child: const Icon(Icons.add, color: Colors.white, size: 16),
-                      )
+                      Material(
+                        color: Colors.black,
+                        shape: const CircleBorder(),
+                        child: InkResponse(
+                          onTap: onAddToCart,
+                          radius: 20,
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.add, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),

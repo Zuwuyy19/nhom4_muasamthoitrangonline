@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../cart/services/cart_service.dart';
 import '../../cart/services/wishlist_service.dart';
+import 'product_image_viewer.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -11,8 +12,8 @@ class ProductDetailScreen extends StatefulWidget {
   final String thumbnail;
   final String categoryId;
 
-  final Map<String, dynamic> variants; // { "white": {label, thumbnail, images: []}, ... }
-  final List<String> sizes; // ["S","M"...] hoặc ["27","27.5","EU 42"]...
+  final Map<String, dynamic> variants;
+  final List<String> sizes;
 
   const ProductDetailScreen({
     super.key,
@@ -60,35 +61,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ================= IMAGES =================
   List<String> _imagesForSelectedVariant() {
-    if (widget.variants.isNotEmpty && _selectedVariantKey != null) {
+    if (_selectedVariantKey != null &&
+        widget.variants[_selectedVariantKey] is Map) {
       final v = widget.variants[_selectedVariantKey];
-      if (v is Map) {
-        final raw = v["images"];
-        if (raw is List) {
-          final imgs = raw
-              .map((e) => (e ?? '').toString().trim())
-              .where((s) => s.isNotEmpty)
-              .toList();
-          if (imgs.isNotEmpty) return imgs;
-        }
+      final raw = v['images'];
+      if (raw is List) {
+        final imgs = raw
+            .map((e) => (e ?? '').toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (imgs.isNotEmpty) return imgs;
       }
     }
-    final fb = widget.thumbnail.trim();
-    return fb.isNotEmpty ? [fb] : [];
+    return widget.thumbnail.trim().isNotEmpty
+        ? [widget.thumbnail]
+        : [];
   }
 
   String _thumbnailForVariant(String key) {
     final v = widget.variants[key];
     if (v is Map) {
-      final t = (v["thumbnail"] ?? "").toString().trim();
+      final t = (v['thumbnail'] ?? '').toString().trim();
       if (t.isNotEmpty) return t;
-
-      final raw = v["images"];
-      if (raw is List && raw.isNotEmpty) {
-        final first = (raw.first ?? "").toString().trim();
-        if (first.isNotEmpty) return first;
-      }
     }
     return widget.thumbnail;
   }
@@ -96,87 +92,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String _labelForVariant(String key) {
     final v = widget.variants[key];
     if (v is Map) {
-      final label = (v["label"] ?? "").toString().trim();
+      final label = (v['label'] ?? '').toString().trim();
       if (label.isNotEmpty) return label;
     }
     return key;
   }
 
-  // ✅ FIX: addToCart có size + color(label) + thumbnail theo variant
-  Future<void> _addToCart() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
-      );
-      return;
-    }
-
-    // size
-    String? selectedSize;
-    if (widget.sizes.isNotEmpty) {
-      if (selectedSizeIndex < 0 || selectedSizeIndex >= widget.sizes.length) {
-        selectedSizeIndex = 0;
-      }
-      final s = widget.sizes[selectedSizeIndex].trim();
-      selectedSize = s.isEmpty ? null : s;
-    }
-
-    // color
-    final colorKey = _selectedVariantKey?.trim();
-    if (widget.variants.isNotEmpty && (colorKey == null || colorKey.isEmpty)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn màu trước khi thêm vào giỏ')),
-      );
-      return;
-    }
-
-    String? colorLabel;
-    String finalThumb = widget.thumbnail;
-
-    if (widget.variants.isNotEmpty && colorKey != null && widget.variants[colorKey] is Map) {
-      final v = Map<String, dynamic>.from(widget.variants[colorKey] as Map);
-
-      final label = (v['label'] ?? '').toString().trim();
-      if (label.isNotEmpty) colorLabel = label;
-
-      final thumb = (v['thumbnail'] ?? '').toString().trim();
-      if (thumb.isNotEmpty) finalThumb = thumb;
-    }
-
-    colorLabel ??= colorKey;
-
-    await _cartService.addOrUpdateItem(
-      uid: user.uid,
-      productId: widget.productId,
-      productName: widget.name,
-      price: widget.price,
-      quantity: 1,
-      thumbnail: finalThumb,
-      size: selectedSize,
-      color: colorLabel,
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Đã thêm: ${widget.name}'
-          '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
-          '${selectedSize != null ? " / $selectedSize" : ""}',
-        ),
-      ),
-    );
-  }
-
+  // ================= ACTIONS =================
   Future<void> _addToWishlist() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để thêm yêu thích')),
+        const SnackBar(content: Text('Vui lòng đăng nhập')),
       );
       return;
     }
@@ -192,16 +119,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
+      const SnackBar(content: Text('Đã thêm vào yêu thích')),
     );
   }
 
+  Future<void> _addToCart() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập')),
+      );
+      return;
+    }
+
+    final size = widget.sizes.isNotEmpty
+        ? widget.sizes[selectedSizeIndex]
+        : null;
+
+    await _cartService.addOrUpdateItem(
+      uid: user.uid,
+      productId: widget.productId,
+      productName: widget.name,
+      price: widget.price,
+      quantity: 1,
+      thumbnail: widget.thumbnail,
+      size: size,
+      color: _selectedVariantKey,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã thêm vào giỏ hàng')),
+    );
+  }
+
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
+    final sizeScreen = MediaQuery.of(context).size;
     final images = _imagesForSelectedVariant();
-    if (_activeImageIndex >= images.length) _activeImageIndex = 0;
 
     final hasSizes = widget.sizes.isNotEmpty;
     final hasVariants = widget.variants.isNotEmpty;
@@ -209,151 +165,132 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: size.height * 0.5,
-            child: Stack(
-              children: [
-                PageView.builder(
-                  controller: _pageCtrl,
-                  itemCount: images.length,
-                  onPageChanged: (i) => setState(() => _activeImageIndex = i),
-                  itemBuilder: (context, i) {
-                    final url = images[i];
-                    return Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey.shade200,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.image_not_supported, size: 48),
+          // ================= IMAGE (CHỈ THÊM TAP PHÓNG TO) =================
+          SizedBox(
+            height: sizeScreen.height * 0.5,
+            child: PageView.builder(
+              controller: _pageCtrl,
+              itemCount: images.length,
+              onPageChanged: (i) => setState(() => _activeImageIndex = i),
+              itemBuilder: (context, i) {
+                final url = images[i];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductImageViewer(
+                          images: images,
+                          initialIndex: i,
+                        ),
                       ),
                     );
                   },
-                ),
-                if (images.length > 1)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 12,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(images.length, (i) {
-                        final active = i == _activeImageIndex;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: active ? 18 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: active ? Colors.white : Colors.white70,
-                            borderRadius: BorderRadius.circular(50),
-                          ),
-                        );
-                      }),
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade200,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.image_not_supported, size: 48),
                     ),
                   ),
-              ],
+                );
+              },
             ),
           ),
 
+          // ================= TOP BAR =================
           Positioned(
-            top: 50,
-            left: 20,
-            right: 20,
+            top: 40,
+            left: 16,
+            right: 16,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.arrow_back, color: Colors.black),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _addToWishlist,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.favorite_border, color: Colors.black),
-                  ),
-                ),
+                _circleBtn(Icons.arrow_back,
+                    () => Navigator.pop(context)),
+                _circleBtn(Icons.favorite_border, _addToWishlist),
               ],
             ),
           ),
 
+          // ================= CONTENT =================
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              height: size.height * 0.55,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+              height: sizeScreen.height * 0.55,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 30),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -5))],
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(30)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // name + price
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.name,
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 5),
-                            const Text('Mô tả sản phẩm', style: TextStyle(color: Colors.grey)),
-                          ],
+                        child: Text(
+                          widget.name,
+                          style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
                         '${_formatPrice(widget.price)}đ',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
 
+                  // ====== COLOR ======
                   if (hasVariants) ...[
                     const SizedBox(height: 18),
-                    const Text('Màu sắc', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Màu sắc',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 64,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: widget.variants.keys.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(width: 10),
                         itemBuilder: (_, i) {
-                          final key = widget.variants.keys.elementAt(i);
-                          final selected = key == _selectedVariantKey;
-
+                          final key =
+                              widget.variants.keys.elementAt(i);
+                          final selected =
+                              key == _selectedVariantKey;
                           return GestureDetector(
                             onTap: () {
                               setState(() {
                                 _selectedVariantKey = key;
                                 _activeImageIndex = 0;
                               });
-                              if (_pageCtrl.hasClients) _pageCtrl.jumpToPage(0);
+                              _pageCtrl.jumpToPage(0);
                             },
                             child: Container(
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius:
+                                    BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: selected ? Colors.orange : Colors.grey.shade300,
+                                  color: selected
+                                      ? Colors.orange
+                                      : Colors.grey.shade300,
                                   width: selected ? 2 : 1,
                                 ),
                               ),
@@ -361,11 +298,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               child: Image.network(
                                 _thumbnailForVariant(key),
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: Colors.grey.shade200,
-                                  alignment: Alignment.center,
-                                  child: const Icon(Icons.broken_image),
-                                ),
                               ),
                             ),
                           );
@@ -374,40 +306,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      _selectedVariantKey == null ? '' : _labelForVariant(_selectedVariantKey!),
-                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                      _selectedVariantKey == null
+                          ? ''
+                          : _labelForVariant(_selectedVariantKey!),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600),
                     ),
                   ],
 
+                  // ====== SIZE ======
                   if (hasSizes) ...[
                     const SizedBox(height: 18),
-                    const Text('Chọn size', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Chọn size',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
                     const SizedBox(height: 10),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: List.generate(widget.sizes.length, (index) {
-                          final s = widget.sizes[index];
-                          final selected = selectedSizeIndex == index;
-
+                        children: List.generate(widget.sizes.length,
+                            (index) {
+                          final selected =
+                              selectedSizeIndex == index;
                           return GestureDetector(
-                            onTap: () => setState(() => selectedSizeIndex = index),
+                            onTap: () => setState(
+                                () => selectedSizeIndex = index),
                             child: Container(
-                              margin: const EdgeInsets.only(right: 12),
-                              constraints: const BoxConstraints(minWidth: 60, minHeight: 48),
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                              alignment: Alignment.center,
+                              margin:
+                                  const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 12),
                               decoration: BoxDecoration(
-                                color: selected ? Colors.black : Colors.white,
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(14),
+                                color: selected
+                                    ? Colors.black
+                                    : Colors.white,
+                                borderRadius:
+                                    BorderRadius.circular(14),
+                                border: Border.all(
+                                    color:
+                                        Colors.grey.shade300),
                               ),
                               child: Text(
-                                s,
+                                widget.sizes[index],
                                 style: TextStyle(
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.black,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: selected ? Colors.white : Colors.black,
                                 ),
                               ),
                             ),
@@ -418,6 +364,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ],
 
                   const Spacer(),
+
+                  // ====== ADD TO CART ======
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -425,11 +373,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onPressed: _addToCart,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(15),
+                        ),
                       ),
                       child: const Text(
                         'Thêm vào giỏ hàng',
-                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -438,6 +391,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _circleBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon),
       ),
     );
   }
