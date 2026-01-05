@@ -138,10 +138,21 @@ class WishlistScreen extends StatelessWidget {
                                       const SnackBar(content: Text('Đã thêm vào giỏ hàng')),
                                     );
                                   },
-                                  child: const Text('Thêm vào giỏ'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 4),
+                                    minimumSize: const Size(0, 36),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Thêm giỏ', 
+                                    style: TextStyle(fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
@@ -161,8 +172,20 @@ class WishlistScreen extends StatelessWidget {
                                       ),
                                     );
                                   },
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                                  child: const Text('Mua ngay', style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 4),
+                                    minimumSize: const Size(0, 36),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Mua ngay', 
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                    maxLines: 1, 
+                                    overflow: TextOverflow.ellipsis
+                                  ),
                                 ),
                               ),
                             ],

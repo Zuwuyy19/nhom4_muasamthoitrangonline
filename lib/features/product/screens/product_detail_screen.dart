@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import '../../cart/models/cart_models.dart';
 import '../../cart/services/cart_service.dart';
 import '../../cart/services/wishlist_service.dart';
 import 'package:easy_image_viewer/easy_image_viewer.dart';
@@ -15,6 +16,8 @@ class ProductDetailScreen extends StatefulWidget {
 
   final Map<String, dynamic> variants; // { "white": {label, thumbnail, images: []}, ... }
   final List<String> sizes; // ["S","M"...] hoặc ["27","27.5","EU 42"]...
+  
+  final CartItem? cartItemToEdit; // ✅ Edit Mode
 
   const ProductDetailScreen({
     super.key,
@@ -25,6 +28,7 @@ class ProductDetailScreen extends StatefulWidget {
     required this.categoryId,
     required this.variants,
     required this.sizes,
+    this.cartItemToEdit,
   });
 
   @override
@@ -44,8 +48,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeSelection();
+  }
+  
+  void _initializeSelection() {
+    // 1. Variant
     if (widget.variants.isNotEmpty) {
       _selectedVariantKey = widget.variants.keys.first;
+
+      if (widget.cartItemToEdit != null && widget.cartItemToEdit!.color != null) {
+        final targetLabel = widget.cartItemToEdit!.color!.trim();
+        for (var entry in widget.variants.entries) {
+          final key = entry.key;
+          final val = entry.value;
+          String label = key;
+          if (val is Map) {
+             label = (val["label"] ?? key).toString().trim();
+          }
+          if (label == targetLabel) {
+            _selectedVariantKey = key;
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Size
+    if (widget.sizes.isNotEmpty) {
+      selectedSizeIndex = 0;
+      if (widget.cartItemToEdit != null && widget.cartItemToEdit!.size != null) {
+        final targetSize = widget.cartItemToEdit!.size!.trim();
+        final idx = widget.sizes.indexOf(targetSize);
+        if (idx != -1) {
+          selectedSizeIndex = idx;
+        }
+      }
     }
   }
 
@@ -105,12 +142,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ✅ FIX: addToCart có size + color(label) + thumbnail theo variant
-  Future<void> _addToCart() async {
+  Future<void> _handleCartAction() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
+        const SnackBar(content: Text('Vui lòng đăng nhập để thực hiện')),
       );
       return;
     }
@@ -130,7 +167,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (widget.variants.isNotEmpty && (colorKey == null || colorKey.isEmpty)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn màu trước khi thêm vào giỏ')),
+        const SnackBar(content: Text('Vui lòng chọn màu')),
       );
       return;
     }
@@ -147,30 +184,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final thumb = (v['thumbnail'] ?? '').toString().trim();
       if (thumb.isNotEmpty) finalThumb = thumb;
     }
-
     colorLabel ??= colorKey;
 
+    // Use existing quantity if editing, else 1
+    final int qty = widget.cartItemToEdit?.quantity ?? 1;
+
+    // 1. Add New Item (or update existing if same variants)
     await _cartService.addOrUpdateItem(
       uid: user.uid,
       productId: widget.productId,
       productName: widget.name,
       price: widget.price,
-      quantity: 1,
+      quantity: qty,
       thumbnail: finalThumb,
       size: selectedSize,
       color: colorLabel,
     );
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Đã thêm: ${widget.name}'
-          '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
-          '${selectedSize != null ? " / $selectedSize" : ""}',
+    // 2. If Updating and variants changed, remove old item
+    if (widget.cartItemToEdit != null) {
+       final oldKey = widget.cartItemToEdit!.cartKey;
+       await _cartService.removeItem(uid: user.uid, cartKey: oldKey);
+       
+       if (!mounted) return;
+       Navigator.pop(context); 
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã cập nhật giỏ hàng')),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã thêm: ${widget.name}'
+            '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
+            '${selectedSize != null ? " / $selectedSize" : ""}',
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Future<void> _toggleWishlist() async {
@@ -182,13 +234,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
       return;
     }
-
-    // Check directly from DB or just try to toggle based on current UI state?
-    // Robust way: fetch current state or assume UI is correct.
-    // Let's rely on the service actions.
-    // For simplicity, we will check existence inside the UI StreamBuilder,
-    // but here we just need to know if we should add or remove.
-    // We can query once to be sure.
     
     final dbRef = FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/${widget.productId}');
     final snapshot = await dbRef.get();
@@ -462,14 +507,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: _addToCart,
+                      onPressed: _handleCartAction,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      child: const Text(
-                        'Thêm vào giỏ hàng',
-                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                      child: Text(
+                        widget.cartItemToEdit != null ? 'Cập nhật giỏ hàng' : 'Thêm vào giỏ hàng',
+                        style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
