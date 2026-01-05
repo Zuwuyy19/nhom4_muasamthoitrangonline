@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../cart/services/cart_service.dart';
 import '../../cart/services/wishlist_service.dart';
+import 'package:easy_image_viewer/easy_image_viewer.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -222,13 +223,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   onPageChanged: (i) => setState(() => _activeImageIndex = i),
                   itemBuilder: (context, i) {
                     final url = images[i];
-                    return Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey.shade200,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.image_not_supported, size: 48),
+                    return GestureDetector(
+                      onTap: () {
+                        final imageProviders = images.map((u) => Image.network(u).image).toList();
+                        final multiImageProvider = MultiImageProvider(imageProviders, initialIndex: i);
+                        showImageViewerPager(context, multiImageProvider);
+                      },
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_not_supported, size: 48),
+                        ),
                       ),
                     );
                   },

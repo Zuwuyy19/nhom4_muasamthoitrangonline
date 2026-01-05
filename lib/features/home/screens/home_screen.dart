@@ -283,51 +283,93 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _homeContent() {
+    final bool isSearching = _searchQuery.isNotEmpty;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            height: 220,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(20),
-              image: const DecorationImage(
-                image: NetworkImage("https://cdn.pixabay.com/photo/2017/08/01/11/48/woman-2564660_1280.jpg"),
-                fit: BoxFit.cover,
-                opacity: 0.6,
+          // Thanh tìm kiếm
+          TextField(
+            controller: _searchController,
+            onChanged: (val) => setState(() => _searchQuery = val),
+            decoration: InputDecoration(
+              hintText: "Tìm kiếm sản phẩm...",
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty 
+                ? IconButton(
+                    icon: const Icon(Icons.clear), 
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    }
+                  ) 
+                : null,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
               ),
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
-                const SizedBox(height: 5),
-                const Text(
-                  "GIẢM GIÁ\nMÙA HÈ 50%",
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () => setState(() => _selectedIndex = 1),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text("Xem sản phẩm", style: TextStyle(fontSize: 12)),
-                ),
-              ],
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.black, width: 1.5),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade100,
             ),
           ),
-          const SizedBox(height: 18),
-          const Text("Sản phẩm", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
+
+          // Banner & Title (chỉ hiển thị khi không tìm kiếm)
+          if (!isSearching) ...[
+            Container(
+              width: double.infinity,
+              height: 220,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(20),
+                image: const DecorationImage(
+                  image: NetworkImage("https://cdn.pixabay.com/photo/2017/08/01/11/48/woman-2564660_1280.jpg"),
+                  fit: BoxFit.cover,
+                  opacity: 0.6,
+                ),
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Bộ sưu tập mới", style: TextStyle(color: Colors.white, fontSize: 14)),
+                  const SizedBox(height: 5),
+                  const Text(
+                    "GIẢM GIÁ\nMÙA HÈ 50%",
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _selectedIndex = 1),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text("Xem sản phẩm", style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text("Sản phẩm", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+          ],
+
+          // Grid sản phẩm
           StreamBuilder<DatabaseEvent>(
             stream: _productsRef.onValue,
             builder: (context, snapshot) {
@@ -335,13 +377,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 return const Center(child: Padding(padding: EdgeInsets.only(top: 30), child: CircularProgressIndicator()));
               }
               if (snapshot.hasError) return _noData('Lỗi tải dữ liệu: ${snapshot.error}');
+              
               final all = _parseProducts(snapshot.data?.snapshot.value);
-              if (all.isEmpty) return _noData('Chưa có sản phẩm.');
+              List<Map<String, dynamic>> displayList = [];
+
+              if (isSearching) {
+                // Lọc theo từ khóa (category 'all')
+                displayList = _filterProducts(all, 'all', _searchQuery);
+                if (displayList.isEmpty) return _noData('Không tìm thấy sản phẩm nào.');
+              } else {
+                // Mặc định hiển thị 6 sản phẩm
+                displayList = all.length > 6 ? all.sublist(0, 6) : all;
+                if (displayList.isEmpty) return _noData('Chưa có sản phẩm.');
+              }
 
               return GridView.builder(
                 physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
-                itemCount: all.length > 6 ? 6 : all.length,
+                itemCount: displayList.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
@@ -349,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   childAspectRatio: 0.7,
                 ),
                 itemBuilder: (_, i) {
-                  final p = all[i];
+                  final p = displayList[i];
                   return ProductCard(
                     title: p["name"] ?? "Sản phẩm",
                     price: p["priceText"] ?? "N/A",
