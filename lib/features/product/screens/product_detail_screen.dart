@@ -189,6 +189,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Use existing quantity if editing, else 1
     final int qty = widget.cartItemToEdit?.quantity ?? 1;
 
+    // ✅ FIX: Check if "No Change"
+    if (widget.cartItemToEdit != null) {
+      final oldSize = (widget.cartItemToEdit!.size ?? '').trim();
+      final newSize = (selectedSize ?? '').trim();
+      
+      final oldColor = (widget.cartItemToEdit!.color ?? '').trim();
+      final newColor = (colorLabel ?? '').trim();
+
+      if (oldSize == newSize && oldColor == newColor) {
+         if (!mounted) return;
+         Navigator.pop(context);
+        //  Optional: Show message or just silent pop
+        //  ScaffoldMessenger.of(context).showSnackBar(
+        //    const SnackBar(content: Text('Giỏ hàng đã cập nhật')),
+        //  );
+         return;
+      }
+    }
+
     // 1. Add New Item (or update existing if same variants)
     await _cartService.addOrUpdateItem(
       uid: user.uid,

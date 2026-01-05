@@ -10,6 +10,10 @@ import '../../cart/services/cart_service.dart';
 
 import '../../profile/screens/profile_screen.dart';
 
+
+import 'dart:async';
+import 'package:easy_image_viewer/easy_image_viewer.dart';
+
 final DatabaseReference _productsRef = FirebaseDatabase.instance.ref('products');
 final DatabaseReference _categoriesRef = FirebaseDatabase.instance.ref('categories');
 
@@ -26,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _selectedCategoryKey = 'all';
   
-  // Biến phục vụ chức năng tìm kiếm
   // Biến phục vụ chức năng tìm kiếm
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -538,6 +541,7 @@ class HomeBannerSlider extends StatefulWidget {
 class _HomeBannerSliderState extends State<HomeBannerSlider> {
   late PageController _bannerCtrl;
   int _bannerIndex = 0;
+  Timer? _timer;
 
   final List<Map<String, String>> _banners = [
     {
@@ -555,16 +559,39 @@ class _HomeBannerSliderState extends State<HomeBannerSlider> {
       "subtitle": "Phụ kiện cao cấp",
       "title": "GIẢM 30%\nCHO GIÀY"
     },
+    {
+      "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIURTMV0Gr7A1p0acL_dWACOv4WnEyfN4ArQ&s",
+      "subtitle": "Bảng size",
+      "title": "BẢNG SIZE\nQUẦN ÁO"
+    },
   ];
 
   @override
   void initState() {
     super.initState();
     _bannerCtrl = PageController();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (_bannerCtrl.hasClients) {
+        int nextIndex = _bannerIndex + 1;
+        if (nextIndex >= _banners.length) {
+          nextIndex = 0;
+        }
+        _bannerCtrl.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _bannerCtrl.dispose();
     super.dispose();
   }
@@ -581,8 +608,21 @@ class _HomeBannerSliderState extends State<HomeBannerSlider> {
             onPageChanged: (i) => setState(() => _bannerIndex = i),
             itemBuilder: (_, index) {
               final banner = _banners[index];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+              final isSizeChart = banner["subtitle"] == "Bảng size";
+
+              void _handleTap() {
+                if (isSizeChart) {
+                  final imageProvider = Image.network(banner["image"]!).image;
+                  showImageViewer(context, imageProvider);
+                } else {
+                  widget.onShopNow();
+                }
+              }
+
+              return GestureDetector(
+                onTap: _handleTap,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.black,
@@ -605,7 +645,7 @@ class _HomeBannerSliderState extends State<HomeBannerSlider> {
                     ),
                     const Spacer(),
                     ElevatedButton(
-                      onPressed: widget.onShopNow,
+                      onPressed: _handleTap,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
@@ -613,9 +653,10 @@ class _HomeBannerSliderState extends State<HomeBannerSlider> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text("Xem ngay", style: TextStyle(fontSize: 12)),
+                      child: Text(isSizeChart ? "Xem chi tiết" : "Xem ngay", style: const TextStyle(fontSize: 12)),
                     ),
                   ],
+                ),
                 ),
               );
             },
