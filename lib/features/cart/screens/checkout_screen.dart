@@ -60,6 +60,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    if (user == null) return;
+    // Guest doesn't have profile data in RTDB users/{uid} usually
+    if (user.isAnonymous) return;
+
     try {
       final snap = await _usersRef.child(user.uid).get();
       if (!snap.exists) return;
@@ -412,6 +416,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      // Should not happen if we forced login/guest, but just in case
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng đăng nhập để đặt hàng')),
       );

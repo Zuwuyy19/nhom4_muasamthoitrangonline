@@ -274,11 +274,13 @@ if (millis == null) return '---';
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final isGuest = user == null;
+    // Guest is technically "logged in" with anonymous auth, so user != null.
+    // We check user.isAnonymous to distinguish.
+    final isGuest = user == null || user.isAnonymous;
 
     if (isGuest) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Hồ sơ')),
+        appBar: AppBar(title: const Text('Hồ sơ (Khách)')),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(16),
