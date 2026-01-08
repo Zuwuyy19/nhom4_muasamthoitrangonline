@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../auth/auth_service.dart';
 
 import '../../auth/screens/login_screen.dart';
@@ -13,6 +16,7 @@ import 'order_history_screen.dart';
 import 'pending_orders_screen.dart';
 import 'processing_orders_screen.dart';
 import 'wishlist_screen.dart';
+import 'change_password_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -168,6 +172,42 @@ shape: const RoundedRectangleBorder(
     } catch (e) {
       if (!mounted) return;
       _showMessage(context, 'Không thể cập nhật: $e');
+    }
+  }
+
+  Future<void> _pickAndUploadImage(String uid) async {
+    final picker = ImagePicker();
+    try {
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 500, // Reduced size for RTDB
+        maxHeight: 500,
+        imageQuality: 70, // Reduced quality for RTDB
+      );
+      
+      if (pickedFile == null) return;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đang xử lý ảnh...')),
+      );
+
+      final bytes = await File(pickedFile.path).readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      await _usersRef.child(uid).update({
+        'photoBase64': base64Image,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cập nhật ảnh đại diện thành công')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi cập nhật ảnh: $e')),
+      );
     }
   }
 
@@ -344,6 +384,7 @@ icon: Icons.person_outline,
         final phone = _getString(data, 'phone', '---');
         final address = _getString(data, 'address', '---');
         final role = _getString(data, 'role', 'customer');
+        final photoBase64 = _getString(data, 'photoBase64', '');
         final createdAt = _formatCreatedAt(data);
 
         return Scaffold(
@@ -371,15 +412,9 @@ appBar: AppBar(
                 _ProfileHeader(
                   displayName: fullName,
                   email: email,
+                  photoBase64: photoBase64,
                   isGuest: false,
-                  onEdit: () => _showPersonalInfo(
-                    fullName: fullName,
-                    email: email,
-                    phone: phone,
-                    address: address,
-                    role: role,
-                    createdAt: createdAt,
-                  ),
+                  onEdit: () => _pickAndUploadImage(uid),
                   onLogin: _openLogin,
                   onRegister: _openRegister,
                 ),
@@ -440,9 +475,14 @@ MaterialPageRoute(
                 ),
                 _ProfileTile(
                   title: 'Đổi mật khẩu',
-                  subtitle: 'Gửi email đặt lại mật khẩu',
+                  subtitle: 'Thay đổi mật khẩu đăng nhập',
                   icon: Icons.lock_outline,
-                  onTap: () => _sendPasswordReset(email),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordScreen(),
+                    ),
+                  ),
                 ),
                 _ProfileTile(
                   title: 'Địa chỉ giao hàng',
@@ -517,10 +557,12 @@ class _ProfileHeader extends StatelessWidget {
     required this.onEdit,
     required this.onLogin,
     required this.onRegister,
+    this.photoBase64,
   });
 
   final String displayName;
   final String email;
+  final String? photoBase64;
   final bool isGuest;
   final VoidCallback onEdit;
   final VoidCallback onLogin;
@@ -528,6 +570,13 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? imageProvider;
+    if (photoBase64 != null && photoBase64!.isNotEmpty) {
+      try {
+        imageProvider = MemoryImage(base64Decode(photoBase64!));
+      } catch (_) {}
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -540,10 +589,34 @@ class _ProfileHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 34,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 36, color: Colors.black87),
+          Stack(
+            children: [
+              GestureDetector(
+                onTap: isGuest ? null : onEdit,
+                child: CircleAvatar(
+                  radius: 34,
+                  backgroundColor: Colors.white,
+                  backgroundImage: imageProvider,
+                  child: imageProvider == null
+                      ? const Icon(Icons.person, size: 36, color: Colors.black87)
+                      : null,
+                ),
+              ),
+              if (!isGuest)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt,
+                        size: 14, color: Colors.white),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 14),
           Expanded(

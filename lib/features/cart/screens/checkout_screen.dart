@@ -11,7 +11,7 @@ import '../services/cart_service.dart';
 import '../services/order_service.dart';
 
 import '../../home/screens/home_screen.dart';
-import 'momo_payment_screen.dart';
+
 import 'vnpay_payment_screen.dart';
 
 // ✅ Map picker cùng folder
@@ -240,13 +240,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 10),
 
-              _buildPaymentOption(
-                2,
-                "Ví điện tử MoMo",
-                Icons.account_balance_wallet,
-                Colors.pink,
-              ),
-              const SizedBox(height: 10),
+
 
               _buildPaymentOption(
                 3,
@@ -437,7 +431,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final paymentMethod = switch (_paymentMethod) {
       1 => 'COD',
-      2 => 'Momo',
+
       3 => 'VNPay',
       _ => 'COD',
     };
@@ -525,21 +519,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // MoMo
-    if (_paymentMethod == 2) {
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MomoPaymentScreen(
-            totalAmount: finalAmount,
-            customerName: customerName,
-            phoneNumber: _phoneController.text.trim(),
-          ),
-        ),
-      );
-      return;
-    }
+
 
     // VNPay
     if (_paymentMethod == 3) {
