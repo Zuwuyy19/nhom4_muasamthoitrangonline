@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../auth/screens/login_screen.dart';
+import '../../product/screens/product_detail_screen.dart';
 import '../models/cart_models.dart';
 import '../services/cart_service.dart';
 import 'checkout_screen.dart';
@@ -29,6 +31,51 @@ class _CartScreenState extends State<CartScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  // ✅ Re-add Edit Logic
+  Future<void> _editCartItem(CartItem item) async {
+    final ref = FirebaseDatabase.instance.ref('products/${item.productId}');
+    final snapshot = await ref.get();
+    
+    if (!snapshot.exists || !mounted) return;
+    
+    final productData = snapshot.value;
+    if (productData is! Map) return;
+    
+    final name = (productData["name"] ?? "Sản phẩm").toString();
+    final priceRaw = productData["price"] ?? 0;
+    final int price = int.tryParse(priceRaw.toString()) ?? 0;
+    final thumbnail = (productData["thumbnail"] ?? productData["image"] ?? "").toString();
+    final categoryId = (productData["categoryId"] ?? productData["category"] ?? "all").toString();
+    
+    final rawVariants = productData["variants"];
+    final Map<String, dynamic> variants = (rawVariants is Map) 
+        ? Map<String, dynamic>.from(rawVariants) 
+        : {};
+        
+    final rawSizes = productData["sizes"];
+    final List<String> sizes = (rawSizes is List) 
+        ? List<String>.from(rawSizes.map((e) => e.toString())) 
+        : [];
+        
+    Map<String, dynamic> safeVariants = variants;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailScreen(
+          productId: item.productId,
+          name: name,
+          price: price,
+          thumbnail: thumbnail,
+          categoryId: categoryId,
+          variants: safeVariants,
+          sizes: sizes,
+          cartItemToEdit: item, 
+        ),
+      ),
     );
   }
 
@@ -90,7 +137,6 @@ class _CartScreenState extends State<CartScreen> {
                     final item = items[index];
 
                     return Dismissible(
-                      // ✅ Dùng cartKey (vì cartKey mới là key trong DB)
                       key: Key(item.cartKey),
                       direction: DismissDirection.endToStart,
                       onDismissed: (_) => _cartService.removeItem(
@@ -106,7 +152,11 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
-                      child: _buildCartItem(item, user.uid),
+                      // ✅ Wrap in GestureDetector for Edit
+                      child: GestureDetector(
+                        onTap: () => _editCartItem(item),
+                        child: _buildCartItem(item, user.uid),
+                      ),
                     );
                   },
                 ),
@@ -218,11 +268,16 @@ class _CartScreenState extends State<CartScreen> {
                   ],
                 ),
 
-                // ✅ Hiển thị màu/size (nếu có)
                 const SizedBox(height: 6),
-                Text(
-                  '${item.color ?? '---'}${item.size != null ? " / ${item.size}" : ""}',
-                  style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                Row(
+                  children: [
+                    Text(
+                      '${item.color ?? '---'}${item.size != null ? " / ${item.size}" : ""}',
+                      style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.edit_outlined, size: 14, color: Colors.blueGrey),
+                  ],
                 ),
 
                 const SizedBox(height: 10),

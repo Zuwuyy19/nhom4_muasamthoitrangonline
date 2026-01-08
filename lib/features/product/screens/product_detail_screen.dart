@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
+import '../../cart/models/cart_models.dart';
 import '../../cart/services/cart_service.dart';
 import '../../cart/services/wishlist_service.dart';
+import 'package:easy_image_viewer/easy_image_viewer.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -13,6 +16,8 @@ class ProductDetailScreen extends StatefulWidget {
 
   final Map<String, dynamic> variants; // { "white": {label, thumbnail, images: []}, ... }
   final List<String> sizes; // ["S","M"...] hoặc ["27","27.5","EU 42"]...
+  
+  final CartItem? cartItemToEdit; // ✅ Edit Mode
 
   const ProductDetailScreen({
     super.key,
@@ -23,6 +28,7 @@ class ProductDetailScreen extends StatefulWidget {
     required this.categoryId,
     required this.variants,
     required this.sizes,
+    this.cartItemToEdit,
   });
 
   @override
@@ -42,8 +48,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeSelection();
+  }
+  
+  void _initializeSelection() {
+    // 1. Variant
     if (widget.variants.isNotEmpty) {
       _selectedVariantKey = widget.variants.keys.first;
+
+      if (widget.cartItemToEdit != null && widget.cartItemToEdit!.color != null) {
+        final targetLabel = widget.cartItemToEdit!.color!.trim();
+        for (var entry in widget.variants.entries) {
+          final key = entry.key;
+          final val = entry.value;
+          String label = key;
+          if (val is Map) {
+             label = (val["label"] ?? key).toString().trim();
+          }
+          if (label == targetLabel) {
+            _selectedVariantKey = key;
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Size
+    if (widget.sizes.isNotEmpty) {
+      selectedSizeIndex = 0;
+      if (widget.cartItemToEdit != null && widget.cartItemToEdit!.size != null) {
+        final targetSize = widget.cartItemToEdit!.size!.trim();
+        final idx = widget.sizes.indexOf(targetSize);
+        if (idx != -1) {
+          selectedSizeIndex = idx;
+        }
+      }
     }
   }
 
@@ -103,12 +142,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ✅ FIX: addToCart có size + color(label) + thumbnail theo variant
-  Future<void> _addToCart() async {
+  Future<void> _handleCartAction() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để thêm vào giỏ hàng')),
+        const SnackBar(content: Text('Vui lòng đăng nhập để thực hiện')),
       );
       return;
     }
@@ -128,7 +167,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (widget.variants.isNotEmpty && (colorKey == null || colorKey.isEmpty)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn màu trước khi thêm vào giỏ')),
+        const SnackBar(content: Text('Vui lòng chọn màu')),
       );
       return;
     }
@@ -145,33 +184,67 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final thumb = (v['thumbnail'] ?? '').toString().trim();
       if (thumb.isNotEmpty) finalThumb = thumb;
     }
-
     colorLabel ??= colorKey;
 
+    // Use existing quantity if editing, else 1
+    final int qty = widget.cartItemToEdit?.quantity ?? 1;
+
+    // ✅ FIX: Check if "No Change"
+    if (widget.cartItemToEdit != null) {
+      final oldSize = (widget.cartItemToEdit!.size ?? '').trim();
+      final newSize = (selectedSize ?? '').trim();
+      
+      final oldColor = (widget.cartItemToEdit!.color ?? '').trim();
+      final newColor = (colorLabel ?? '').trim();
+
+      if (oldSize == newSize && oldColor == newColor) {
+         if (!mounted) return;
+         Navigator.pop(context);
+        //  Optional: Show message or just silent pop
+        //  ScaffoldMessenger.of(context).showSnackBar(
+        //    const SnackBar(content: Text('Giỏ hàng đã cập nhật')),
+        //  );
+         return;
+      }
+    }
+
+    // 1. Add New Item (or update existing if same variants)
     await _cartService.addOrUpdateItem(
       uid: user.uid,
       productId: widget.productId,
       productName: widget.name,
       price: widget.price,
-      quantity: 1,
+      quantity: qty,
       thumbnail: finalThumb,
       size: selectedSize,
       color: colorLabel,
     );
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Đã thêm: ${widget.name}'
-          '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
-          '${selectedSize != null ? " / $selectedSize" : ""}',
+    // 2. If Updating and variants changed, remove old item
+    if (widget.cartItemToEdit != null) {
+       final oldKey = widget.cartItemToEdit!.cartKey;
+       await _cartService.removeItem(uid: user.uid, cartKey: oldKey);
+       
+       if (!mounted) return;
+       Navigator.pop(context); 
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã cập nhật giỏ hàng')),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã thêm: ${widget.name}'
+            '${colorLabel != null && colorLabel!.trim().isNotEmpty ? " - $colorLabel" : ""}'
+            '${selectedSize != null ? " / $selectedSize" : ""}',
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
-  Future<void> _addToWishlist() async {
+  Future<void> _toggleWishlist() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (!mounted) return;
@@ -180,20 +253,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
       return;
     }
-
-    await _wishlistService.addItem(
-      uid: user.uid,
-      productId: widget.productId,
-      productName: widget.name,
-      price: widget.price,
-      thumbnail: widget.thumbnail,
-      categoryId: widget.categoryId,
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
-    );
+    
+    final dbRef = FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/${widget.productId}');
+    final snapshot = await dbRef.get();
+    
+    if (snapshot.exists) {
+        await _wishlistService.removeItem(uid: user.uid, productId: widget.productId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã xóa khỏi danh sách yêu thích')),
+        );
+    } else {
+        await _wishlistService.addItem(
+            uid: user.uid,
+            productId: widget.productId,
+            productName: widget.name,
+            price: widget.price,
+            thumbnail: widget.thumbnail,
+            categoryId: widget.categoryId,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
+        );
+    }
   }
 
   @override
@@ -205,6 +288,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final hasSizes = widget.sizes.isNotEmpty;
     final hasVariants = widget.variants.isNotEmpty;
+    
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       body: Stack(
@@ -222,13 +307,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   onPageChanged: (i) => setState(() => _activeImageIndex = i),
                   itemBuilder: (context, i) {
                     final url = images[i];
-                    return Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey.shade200,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.image_not_supported, size: 48),
+                    return GestureDetector(
+                      onTap: () {
+                        final imageProviders = images.map((u) => Image.network(u).image).toList();
+                        final multiImageProvider = MultiImageProvider(imageProviders, initialIndex: i);
+                        showImageViewerPager(context, multiImageProvider);
+                      },
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_not_supported, size: 48),
+                        ),
                       ),
                     );
                   },
@@ -274,13 +366,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: const Icon(Icons.arrow_back, color: Colors.black),
                   ),
                 ),
-                GestureDetector(
-                  onTap: _addToWishlist,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.favorite_border, color: Colors.black),
-                  ),
+                StreamBuilder(
+                  stream: user == null ? null : FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/${widget.productId}').onValue,
+                  builder: (context, snapshot) {
+                      final exists = snapshot.hasData && 
+                                     snapshot.data != null && 
+                                     (snapshot.data! as DatabaseEvent).snapshot.exists;
+                      
+                      return GestureDetector(
+                        onTap: _toggleWishlist,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: Icon(
+                            exists ? Icons.favorite : Icons.favorite_border,
+                            color: exists ? Colors.red : Colors.black,
+                          ),
+                        ),
+                      );
+                  },
                 ),
               ],
             ),
@@ -422,14 +526,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: _addToCart,
+                      onPressed: _handleCartAction,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      child: const Text(
-                        'Thêm vào giỏ hàng',
-                        style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                      child: Text(
+                        widget.cartItemToEdit != null ? 'Cập nhật giỏ hàng' : 'Thêm vào giỏ hàng',
+                        style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),

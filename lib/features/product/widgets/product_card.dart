@@ -1,22 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../../cart/services/wishlist_service.dart';
 
 class ProductCard extends StatelessWidget {
+  final String id;
   final String title;
   final String price;
+  final int priceInt;
   final String imageUrl;
+  final String categoryId;
   final VoidCallback onTap;
 
-  // SỬA LỖI 2: Dùng super.key cho ngắn gọn, chuẩn Flutter mới
   const ProductCard({
     super.key, 
+    required this.id,
     required this.title,
     required this.price,
+    required this.priceInt,
     required this.imageUrl,
+    required this.categoryId,
     required this.onTap,
   });
 
+  Future<void> _toggleWishlist(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để thêm yêu thích')),
+      );
+      return;
+    }
+
+    final wishlistService = WishlistService();
+    final dbRef = FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/$id');
+    final snapshot = await dbRef.get();
+    
+    if (snapshot.exists) {
+        await wishlistService.removeItem(uid: user.uid, productId: id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã xóa khỏi danh sách yêu thích')),
+          );
+        }
+    } else {
+        await wishlistService.addItem(
+            uid: user.uid,
+            productId: id,
+            productName: title,
+            price: priceInt,
+            thumbnail: imageUrl,
+            categoryId: categoryId,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
+          );
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -25,7 +72,6 @@ class ProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              // SỬA LỖI 1: Thay withOpacity(0.1) bằng withValues(alpha: 0.1)
               color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 5,
@@ -47,14 +93,30 @@ class ProductCard extends StatelessWidget {
                     fit: BoxFit.cover,
                   ),
                 ),
-                child: const Align(
+                child: Align(
                   alignment: Alignment.topRight,
                   child: Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.favorite_border, size: 16, color: Colors.grey),
+                    padding: const EdgeInsets.all(8.0),
+                    child: StreamBuilder(
+                      stream: user == null ? null : FirebaseDatabase.instance.ref('users/${user.uid}/wishlist/$id').onValue,
+                      builder: (context, snapshot) {
+                        final exists = snapshot.hasData && 
+                                       snapshot.data != null && 
+                                       (snapshot.data! as DatabaseEvent).snapshot.exists;
+                        
+                        return GestureDetector(
+                          onTap: () => _toggleWishlist(context),
+                          child: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.white,
+                            child: Icon(
+                              exists ? Icons.favorite : Icons.favorite_border,
+                              size: 16, 
+                              color: exists ? Colors.red : Colors.grey
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
