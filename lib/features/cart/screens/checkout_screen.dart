@@ -479,15 +479,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final String customerName = _nameController.text.trim();
     final int finalAmount = widget.totalAmount + 30000;
 
-    final paymentMethod = switch (_paymentMethod) {
-      1 => 'COD',
-
-      3 => 'VNPay',
-      _ => 'COD',
-    };
-
-    final paymentStatus = paymentMethod == 'COD' ? 'unpaid' : 'pending';
-
     final orderItems = cartItems
         .map(
           (item) => OrderItem(
@@ -496,34 +487,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             price: item.price,
             quantity: item.quantity,
             thumbnail: item.thumbnail,
-            // ✅ nếu OrderItem model bạn có size/color thì mở ra:
-            // size: item.size,
-            // color: item.color,
           ),
         )
         .toList();
 
-    await _orderService.createOrder(
-      userId: user.uid,
-      userName: customerName,
-      totalAmount: finalAmount,
-      status: 'pending',
-      items: orderItems,
-      paymentMethod: paymentMethod,
-      paymentStatus: paymentStatus,
-
-      // ✅ nếu OrderService bạn có support thì mở ra dùng:
-      // phone: _phoneController.text.trim(),
-      // address: _addressController.text.trim(),
-      // mapAddressName: _addressName,
-      // lat: _selectedLocation.latitude,
-      // lng: _selectedLocation.longitude,
-    );
-
-    await _cartService.clearCart(user.uid);
-
+    // Logic chia nhánh phương thức thanh toán
     // COD
     if (_paymentMethod == 1) {
+      await _processOrder(
+        user: user,
+        customerName: customerName,
+        finalAmount: finalAmount,
+        orderItems: orderItems,
+        paymentMethod: 'COD',
+        paymentStatus: 'unpaid',
+      );
       _showSuccessDialog();
       return;
     }
@@ -532,11 +510,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // VNPay
     if (_paymentMethod == 3) {
-      await _createVnpayPaymentUrl(finalAmount);
+      final success = await _createVnpayPaymentUrl(finalAmount);
+      if (success == true) {
+        await _processOrder(
+          user: user,
+          customerName: customerName,
+          finalAmount: finalAmount,
+          orderItems: orderItems,
+          paymentMethod: 'VNPay',
+          paymentStatus: 'paid', // Đã thanh toán thành công
+        );
+        _showSuccessDialog();
+      }
     }
   }
 
-  Future<void> _createVnpayPaymentUrl(int totalAmount) async {
+  /// Helper: Tạo đơn hàng và clear giỏ hàng (Chỉ gọi khi chắc chắn đặt hàng/thanh toán xong)
+  Future<void> _processOrder({
+    required User user,
+    required String customerName,
+    required int finalAmount,
+    required List<OrderItem> orderItems,
+    required String paymentMethod,
+    required String paymentStatus,
+  }) async {
+      await _orderService.createOrder(
+      userId: user.uid,
+      userName: customerName,
+      totalAmount: finalAmount,
+      status: 'pending',
+      items: orderItems,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+    );
+
+    await _cartService.clearCart(user.uid);
+  }
+
+  Future<bool> _createVnpayPaymentUrl(int totalAmount) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -560,14 +571,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }),
       );
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Close loading dialog
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['code'] == '00' && data['data'] != null) {
           final String vnpayUrl = data['data'];
 
-          if (!mounted) return;
+          if (!mounted) return false;
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
@@ -575,20 +586,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           );
 
-          if (result == true) {
-            _showSuccessDialog();
-          }
-          return;
+          return result == true;
         }
       }
 
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi Server Backend: ${response.statusCode}')),
       );
+      return false;
     } catch (_) {
-      if (mounted) Navigator.pop(context);
-      if (!mounted) return;
+      if (mounted) Navigator.pop(context); // Close loading if error
+      if (!mounted) return false;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -597,6 +606,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       );
+      return false;
     }
   }
 }
