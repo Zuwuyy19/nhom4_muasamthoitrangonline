@@ -112,29 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleGuestLogin() async {
-    setState(() => _loading = true);
-    try {
-      await FirebaseAuth.instance.signInAnonymously();
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Lỗi Firebase Auth (${e.code}): ${e.message}")),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Lỗi không xác định: $e")),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+
 
   InputDecoration _decor(String label, {IconData? icon}) {
     return InputDecoration(
@@ -220,12 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text("Chưa có tài khoản? Đăng ký"),
                 ),
 
-                const Divider(),
-                
-                TextButton(
-                  onPressed: _loading ? null : _handleGuestLogin,
-                  child: const Text("Tiếp tục mà không cần đăng nhập (Khách)"),
-                ),
+
               ],
             ),
           ),

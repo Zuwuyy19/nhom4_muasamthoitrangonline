@@ -38,7 +38,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _didPrefill = false;
 
   // *** QUAN TRỌNG: IP backend Node.js ***
-  final String backendApiUrl = 'http://192.168.1.3:3000/create_payment_url';
+  final String backendApiUrl = 'http://192.168.1.5:3000/create_payment_url';
 
   // Tọa độ mặc định (Ví dụ: HUTECH - TPHCM)
   LatLng _selectedLocation = const LatLng(10.801657, 106.714247);
