@@ -411,6 +411,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ORDER HANDLING
   // =========================
 
+  void _showSuccessDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 80),
+            const SizedBox(height: 20),
+            const Text(
+              'Đặt hàng thành công!',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            const Text('Giao đến:', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 5),
+            Text(
+              _addressName,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                    (route) => false,
+                  );
+                },
+                child: const Text('Tiếp tục mua sắm', style: TextStyle(color: Colors.white)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -479,48 +524,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // COD
     if (_paymentMethod == 1) {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 80),
-              const SizedBox(height: 20),
-              const Text(
-                'Đặt hàng thành công!',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text('Giao đến:', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 5),
-              Text(
-                _addressName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      (route) => false,
-                    );
-                  },
-                  child: const Text('Tiếp tục mua sắm', style: TextStyle(color: Colors.white)),
-                ),
-              )
-            ],
-          ),
-        ),
-      );
+      _showSuccessDialog();
       return;
     }
 
@@ -564,12 +568,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final String vnpayUrl = data['data'];
 
           if (!mounted) return;
-          Navigator.push(
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => VnpayPaymentScreen(vnpayUrl: vnpayUrl),
             ),
           );
+
+          if (result == true) {
+            _showSuccessDialog();
+          }
           return;
         }
       }

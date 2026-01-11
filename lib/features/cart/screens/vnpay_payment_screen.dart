@@ -36,23 +36,21 @@ class _VnpayPaymentScreenState extends State<VnpayPaymentScreen> {
             if (uri.host.contains('localhost') && uri.port == 8080) {
               
               String responseCode = uri.queryParameters['vnp_ResponseCode'] ?? 'N/A';
-              String message;
               
               if (responseCode == '00') {
-                  message = 'Thanh toán VNPAY thành công!';
+                  // Thành công -> Trả về true để CheckoutScreen hiện dialog
+                  Navigator.pop(context, true);
               } else {
-                  message = 'Thanh toán thất bại (Mã lỗi: $responseCode)';
+                  // Thất bại -> Trả về false (hoặc thông báo)
+                  Navigator.pop(context, false);
+                  
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Thanh toán thất bại (Mã lỗi: $responseCode)')),
+                    );
+                  });
               }
-
-              // Hiển thị kết quả (SnackBar) và đóng màn hình
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
-              });
               
-              Navigator.pop(context); // Đóng WebView
-              Navigator.pop(context); // Quay về HomeScreen
               return NavigationDecision.prevent; // Ngăn chặn điều hướng tiếp
             }
 
