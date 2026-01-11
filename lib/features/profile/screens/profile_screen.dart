@@ -419,6 +419,14 @@ appBar: AppBar(
                   onEdit: () => _pickAndUploadImage(uid),
                   onLogin: _openLogin,
                   onRegister: _openRegister,
+                  onViewInfo: () => _showPersonalInfo(
+                    fullName: fullName,
+                    email: email,
+                    phone: phone,
+                    address: address,
+                    role: role,
+                    createdAt: createdAt,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 StreamBuilder<List<WishlistItem>>(
@@ -559,6 +567,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.onEdit,
     required this.onLogin,
     required this.onRegister,
+    this.onViewInfo,
     this.photoBase64,
   });
 
@@ -569,6 +578,7 @@ class _ProfileHeader extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onLogin;
   final VoidCallback onRegister;
+  final VoidCallback? onViewInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -664,7 +674,7 @@ side: const BorderSide(color: Colors.white54),
                   )
                 else
                   OutlinedButton.icon(
-                    onPressed: onEdit,
+                    onPressed: onViewInfo,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white54),
