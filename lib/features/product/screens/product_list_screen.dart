@@ -335,9 +335,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     itemBuilder: (_, i) {
                       final p = filtered[i];
                       return ProductCard(
+                        id: p["id"].toString(),
                         title: p["name"] ?? "Sản phẩm",
                         price: p["priceText"] ?? "N/A",
+                        priceInt: p["price"] ?? 0,
                         imageUrl: p["thumbnail"] ?? "",
+                        categoryId: p["categoryId"] ?? "all",
                         onTap: () => _openDetail(p),
                       );
                     },
